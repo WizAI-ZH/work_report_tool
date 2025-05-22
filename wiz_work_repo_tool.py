@@ -1,5 +1,3 @@
-
-```python
 import streamlit as st
 import json, os, datetime
 
@@ -89,19 +87,33 @@ TEMPLATE = [
   }
 ]
 
+# ------- 初始化控件/状态 -----------
+def init_state():
+    for f in TEMPLATE:
+        if f["key"] not in st.session_state:
+            st.session_state[f["key"]] = ""
+    # 这仨可选，根据你是否允许回填
+    for k in ["user", "dept", "date"]:
+        if k not in st.session_state:
+            st.session_state[k] = ""
+
+init_state()
+
 # -------------------- UI/交互-------------------#
 st.header("📋 工作汇报系统（固定模板·网页版）")
 
 col1, col2, col3 = st.columns([1,1,1])
 with col1:
-    user = st.text_input("姓名")
+    user = st.text_input("姓名", key="user", value=st.session_state.get("user", ""))
 with col2:
-    dept = st.text_input("部门")
+    dept = st.text_input("部门", key="dept", value=st.session_state.get("dept", ""))
 with col3:
-    date = st.date_input("汇报日期", value=datetime.date.today())
+    date = st.date_input("汇报日期", value=datetime.date.today()
+                         if not st.session_state.get("date")
+                         else datetime.datetime.strptime(st.session_state["date"], "%Y-%m-%d").date(), key="date")
 date_str = str(date)
 
-# 用于明日内容自动转今日
+# --- 历史加载 ---
 history_list = load_json(HIST_FILE, [])
 
 def get_last_tomorrow(user, dept):
@@ -112,33 +124,34 @@ def get_last_tomorrow(user, dept):
         return last.get("tomorrow_plan","")
     return ""
 
-curr_fields = {}
 with st.form("report_form"):
+    curr_fields = {}
     for field in TEMPLATE:
         key = field['key']
         title = field['title']
         default_txt = ""
         if key=="today_work":
             default_txt = get_last_tomorrow(user, dept)
-        value = st.text_area(title, value=default_txt, height=100)
+        # 优先使用session_state现值
+        value = st.text_area(title, key=key, value=st.session_state.get(key, default_txt), height=100)
         curr_fields[key] = value
     submitted = st.form_submit_button("生成/保存汇报")
 
 if submitted:
     outlist = []
-    last_tomorrow = ""
     for field in TEMPLATE:
         key = field["key"]
         value = curr_fields[key]
+        st.session_state[key] = value  # 保持当前状态
         if key in ("today_work","tomorrow_plan"):
             value = format_with_bullets(value) if value else ("a. 休息" if key=="tomorrow_plan" else "")
         outlist.append(f"{field['title']}：\n{value}\n")
-        if key=="tomorrow_plan":
-            last_tomorrow = value
     toptext = f"姓名：{user}  部门：{dept}  汇报日期：{date_str}\n"
     report_full = toptext + "="*52 + "\n" + "".join(outlist)
     # 写入历史
-    newentry = {"user":user, "dept":dept, "date":date_str, "report":report_full}
+    newentry = {
+        "user": user, "dept": dept, "date": date_str, "report": report_full
+    }
     for field in TEMPLATE:
         newentry[field["key"]] = curr_fields[field["key"]]
     history_list.append(newentry)
@@ -147,26 +160,42 @@ if submitted:
     st.code(report_full, language="markdown")
     st.download_button("导出为txt", report_full, file_name=f"work_report_{user}_{date_str}.txt")
     st.button("复制内容", on_click=lambda: st.session_state.setdefault('copied', True))
-    # 智能建议
     with st.expander("免费写作建议/优化：", expanded=False):
         st.write(make_suggestion(outlist[0]+outlist[1]))
 
-# --------- 查历史（可一键导入）----------------------
+# --------- 查历史（可一键导入/删除）----------------------
 st.markdown("---")
-with st.expander("历史记录：点击查看历史报表，点击“导入此历史”，会自动填入输入区"):
-    ids = [f"{h.get('user','')}|{h.get('dept','')}|{h.get('date','')}" for h in history_list[::-1]]
-    selected = st.selectbox("选择历史记录", ids)
-    if selected:
-        idx = ids.index(selected)
-        h = history_list[::-1][idx]
-        st.code(h.get("report",""), language="markdown")
-        if st.button("导入此历史作为当前编辑内容"):
-            # 重新填充到session_state
-            for f in TEMPLATE:
-                k = f["key"]
-                st.session_state[k] = h.get(k,"")
-            st.session_state["用户手动导入"] = True
-            st.experimental_rerun()
+with st.expander("历史记录管理（点导入/删除）"):
+    if not history_list:
+        st.info("暂无历史记录")
+    else:
+        # 展示历史从近到远
+        ids = [f"{h.get('user','')}|{h.get('dept','')}|{h.get('date','')}" for h in history_list[::-1]]
+        selected = st.selectbox("选择历史记录", ids)
+        if selected:
+            idx = ids.index(selected)
+            h = history_list[::-1][idx]
+            st.code(h.get("report",""), language="markdown")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("导入此历史作为当前编辑内容"):
+                    # 回填所有输入栏和头部信息
+                    st.session_state["user"] = h.get("user", "")
+                    st.session_state["dept"] = h.get("dept", "")
+                    st.session_state["date"] = h.get("date", get_today())
+                    for f in TEMPLATE:
+                        k = f["key"]
+                        st.session_state[k] = h.get(k,"")
+                    st.success("历史内容已填入，可直接编辑/保存！")
+                    st.experimental_rerun()
+            with c2:
+                if st.button("删除此历史记录"):
+                    # 删除选中这个
+                    del_idx = len(history_list) - 1 - idx
+                    history_list.pop(del_idx)
+                    save_json(HIST_FILE, history_list)
+                    st.success("删除成功！")
+                    st.experimental_rerun()
 
 # --------- 统计分析 --------------
 with st.expander("数据统计分析", expanded=False):
@@ -179,4 +208,3 @@ with st.expander("数据统计分析", expanded=False):
     st.write("各用户提交量：")
     for u,c in user_counter.items():
         st.write(f"- {u}：{c}份")
-```
