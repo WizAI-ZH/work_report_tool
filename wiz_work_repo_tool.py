@@ -1,5 +1,3 @@
-
-```python
 # 文件名如：工作汇报云端版.py（推荐用英文：work_report_web.py)
 
 import streamlit as st
