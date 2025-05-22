@@ -1,28 +1,19 @@
-# 文件名如：工作汇报云端版.py（推荐用英文：work_report_web.py)
 
+```python
 import streamlit as st
 import json, os, datetime
 
-st.set_page_config(page_title="工作汇报系统", layout="wide")
+st.set_page_config(page_title="工作汇报系统（固定模板版）", layout="wide")
 
-# ----------------------- 数据与结构 -------------------------- #
+# ----------------------- 数据路径 -------------------------- #
 DATA_DIR = "work_report_data"
 HIST_FILE = os.path.join(DATA_DIR, "history.json")
-TPL_FILE = os.path.join(DATA_DIR, "template.json")
 
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 if not os.path.exists(HIST_FILE):
     with open(HIST_FILE, "w", encoding="utf-8") as f:
         json.dump([], f)
-if not os.path.exists(TPL_FILE):
-    default_tpl = [
-        {"title":"今日工作完成情况", "key":"today_work"},
-        {"title":"明日工作计划", "key":"tomorrow_plan"},
-        {"title":"遇到问题/需协助", "key":"problems"},
-    ]
-    with open(TPL_FILE, "w", encoding="utf-8") as f:
-        json.dump(default_tpl, f, ensure_ascii=False, indent=2)
 
 def load_json(fp, default):
     try:
@@ -36,7 +27,6 @@ def save_json(fp, obj):
         json.dump(obj, f, ensure_ascii=False, indent=2)
 
 def excel_letters(n):
-    # a, b, ..., z, aa, ab...
     res = ""
     while True:
         n, r = divmod(n, 26)
@@ -87,8 +77,20 @@ def make_suggestion(content):
     advice += SUGGESTIONS[:2] if len(content)<100 else SUGGESTIONS[2:]
     return "\n".join(advice)
 
+# ------- 固定模板 ---------
+TEMPLATE = [
+  {
+    "title": "1、今日工作完成情况",
+    "key": "today_work"
+  },
+  {
+    "title": "2、明日工作计划",
+    "key": "tomorrow_plan"
+  }
+]
+
 # -------------------- UI/交互-------------------#
-st.header("📋 工作汇报系统（云端网页版）")
+st.header("📋 工作汇报系统（固定模板·网页版）")
 
 col1, col2, col3 = st.columns([1,1,1])
 with col1:
@@ -98,12 +100,6 @@ with col2:
 with col3:
     date = st.date_input("汇报日期", value=datetime.date.today())
 date_str = str(date)
-
-# 加载模板
-template = load_json(TPL_FILE, [])
-if not template:
-    st.error("模板丢失，请重置")
-    st.stop()
 
 # 用于明日内容自动转今日
 history_list = load_json(HIST_FILE, [])
@@ -118,10 +114,9 @@ def get_last_tomorrow(user, dept):
 
 curr_fields = {}
 with st.form("report_form"):
-    for field in template:
+    for field in TEMPLATE:
         key = field['key']
         title = field['title']
-        # 明日转今日
         default_txt = ""
         if key=="today_work":
             default_txt = get_last_tomorrow(user, dept)
@@ -132,7 +127,7 @@ with st.form("report_form"):
 if submitted:
     outlist = []
     last_tomorrow = ""
-    for field in template:
+    for field in TEMPLATE:
         key = field["key"]
         value = curr_fields[key]
         if key in ("today_work","tomorrow_plan"):
@@ -144,7 +139,7 @@ if submitted:
     report_full = toptext + "="*52 + "\n" + "".join(outlist)
     # 写入历史
     newentry = {"user":user, "dept":dept, "date":date_str, "report":report_full}
-    for field in template:
+    for field in TEMPLATE:
         newentry[field["key"]] = curr_fields[field["key"]]
     history_list.append(newentry)
     save_json(HIST_FILE, history_list)
@@ -167,12 +162,21 @@ with st.expander("历史记录：点击查看历史报表，点击“导入此�
         st.code(h.get("report",""), language="markdown")
         if st.button("导入此历史作为当前编辑内容"):
             # 重新填充到session_state
-            for f in template:
+            for f in TEMPLATE:
                 k = f["key"]
                 st.session_state[k] = h.get(k,"")
             st.session_state["用户手动导入"] = True
             st.experimental_rerun()
 
-# ---------- 模板定制 ----------------------
-with st.expander("自定义汇报模板", expanded=False):
-    txt = st.text_area("如需调整模板(如增/减栏目/换名称)，请编辑JSON：", value = json.dumps(template, ensure_ascii=False, indent=2))
+# --------- 统计分析 --------------
+with st.expander("数据统计分析", expanded=False):
+    total = len(history_list)
+    user_counter = {}
+    for h in history_list:
+        u = h.get("user","")
+        user_counter[u] = user_counter.get(u,0)+1
+    st.write(f"历史总汇报份数：{total}")
+    st.write("各用户提交量：")
+    for u,c in user_counter.items():
+        st.write(f"- {u}：{c}份")
+```

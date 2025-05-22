@@ -165,6 +165,10 @@ def save_all_inputs():
     with open(CFG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cache, f, ensure_ascii=False, indent=2)
 
+def today_str():
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d")
+
 def load_all_inputs():
     if not os.path.exists(CFG_FILE): return
     with open(CFG_FILE, 'r', encoding='utf-8') as f:
@@ -174,7 +178,11 @@ def load_all_inputs():
             return
     user_var.set(cache.get("user", ""))
     dept_var.set(cache.get("dept", ""))
-    date_var.set(cache.get("date", datetime.now().strftime("%Y-%m-%d")))
+    cached_date = cache.get("date", today_str())
+    if cached_date != today_str():
+        date_var.set(today_str())
+    else:
+        date_var.set(cached_date)
     for k, v in cache.get("fields", {}).items():
         if k in input_widgets:
             input_widgets[k].delete("1.0", tk.END)
