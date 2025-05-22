@@ -175,4 +175,4 @@ with st.expander("历史记录：点击查看历史报表，点击“导入此�
 
 # ---------- 模板定制 ----------------------
 with st.expander("自定义汇报模板", expanded=False):
-    txt = st.text_area("如需调整模板(如增/减栏目/换名称)，请编辑JSON：", value = json.dumps(template, ensure_ascii=False, indent=2)
+    txt = st.text_area("如需调整模板(如增/减栏目/换名称)，请编辑JSON：", value = json.dumps(template, ensure_ascii=False, indent=2))
