@@ -36,7 +36,10 @@ def open_wechat():
     wechat_path = get_wechat_path()
     if wechat_path:
         try:
-            subprocess.Popen([wechat_path])
+            # 隐藏窗口运行
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            subprocess.Popen([wechat_path], startupinfo=startupinfo)
             return True
         except Exception:
             return False
@@ -52,14 +55,17 @@ def open_wechat_chat(chat_name=None):
     wechat_path = get_wechat_path()
     if wechat_path:
         try:
+            # 隐藏窗口运行
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             # 企业微信的命令行参数
             # 注意：企业微信的命令行参数可能会随版本变化
             if chat_name:
                 # 尝试打开指定聊天
-                subprocess.Popen([wechat_path, f"weixin://wxwork/{chat_name}"])
+                subprocess.Popen([wechat_path, f"weixin://wxwork/{chat_name}"], startupinfo=startupinfo)
             else:
                 # 直接打开企业微信
-                subprocess.Popen([wechat_path])
+                subprocess.Popen([wechat_path], startupinfo=startupinfo)
             return True
         except Exception:
             return False

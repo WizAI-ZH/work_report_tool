@@ -281,6 +281,10 @@ def bind_autosave(widget):
     widget.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
     widget.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
     widget.bind("<Control-c>", lambda e: copy_now())  # Ctrl+C 复制内容
+    widget.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
+    widget.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
+    widget.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
+    widget.bind("<Control-p>", lambda e: generate_report(False))  # Ctrl+P 预览汇报
 
 # 任务解析功能
 def parse_and_add_task(event):
@@ -298,6 +302,26 @@ def parse_and_add_task(event):
         )
         messagebox.showinfo("任务添加成功", f"已添加任务：{task_data['name']}")
 
+# Tab键任务输入功能
+def task_tab_input(event):
+    widget = event.widget
+    content = widget.get("1.0", tk.END).strip()
+    
+    # 检查当前输入状态
+    lines = content.split('\n')
+    current_line = widget.get(tk.INSERT + " linestart", tk.INSERT + " lineend").strip()
+    
+    # 检查是否是任务格式的开始
+    if not current_line:
+        # 新任务开始
+        widget.insert(tk.INSERT, "任务名称（进度，完成内容，准备做的内容）")
+    elif "（" in current_line and "）" not in current_line:
+        # 正在输入任务格式，按Tab键自动添加逗号
+        widget.insert(tk.INSERT, ", ")
+    
+    # 阻止默认Tab行为
+    return "break"
+
 user_var.trace_add("write", lambda *a: save_all_inputs())
 dept_var.trace_add("write", lambda *a: save_all_inputs())
 date_var.trace_add("write", lambda *a: save_all_inputs())
@@ -305,6 +329,8 @@ for w in input_widgets.values():
     bind_autosave(w)
     # 绑定任务解析功能
     w.bind("<Control-Return>", parse_and_add_task)
+    # 绑定Tab键任务输入功能
+    w.bind("<Tab>", task_tab_input)
 
 # ===== 输出展示区 =====
 outLf = tk.LabelFrame(root, text="生成的汇报内容", font=("微软雅黑", 12, "bold"), bg="#f8fcff")
