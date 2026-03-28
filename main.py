@@ -233,6 +233,18 @@ def load_all_inputs():
                 y_tomorrow = prev["fields"].get("tomorrow_plan", "")
                 if y_tomorrow and "today_work" in input_widgets:
                     input_widgets["today_work"].insert("1.0", y_tomorrow)
+        
+        # 3. 自动填充未完成任务到明日工作计划
+        from task_tracker import get_pending_tasks
+        pending_tasks = get_pending_tasks()
+        if pending_tasks and "tomorrow_plan" in input_widgets:
+            tomorrow_plan_content = []
+            for task in pending_tasks:
+                # 提取任务的计划内容，如果没有则使用任务名称
+                planned_content = task.get('planned', '') or task.get('name', '')
+                tomorrow_plan_content.append(f"{task['name']}（0%，无，{planned_content}）")
+            if tomorrow_plan_content:
+                input_widgets["tomorrow_plan"].insert("1.0", "\n".join(tomorrow_plan_content))
 
 # ================== GUI设计 ==================
 root = tk.Tk()
@@ -361,19 +373,7 @@ def copy_now():
     txt = output_text.get("1.0", tk.END)
     root.clipboard_clear()
     root.clipboard_append(txt)
-    # 创建自动关闭的消息框
-    msg_window = tk.Toplevel(root)
-    msg_window.title("已复制")
-    msg_window.geometry("300x100")
-    msg_window.transient(root)
-    msg_window.grab_set()
-    
-    # 消息内容
-    label = tk.Label(msg_window, text="汇报内容已复制到剪贴板！", padx=20, pady=20)
-    label.pack()
-    
-    # 3秒后自动关闭
-    msg_window.after(3000, msg_window.destroy)
+    # 不显示消息框，直接复制
 def clear_inputs():
     for t in input_widgets.values():
         t.delete("1.0", tk.END)
