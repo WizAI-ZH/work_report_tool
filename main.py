@@ -361,13 +361,38 @@ def copy_now():
     txt = output_text.get("1.0", tk.END)
     root.clipboard_clear()
     root.clipboard_append(txt)
-    messagebox.showinfo("已复制", "汇报内容已复制到剪贴板！")
+    # 创建自动关闭的消息框
+    msg_window = tk.Toplevel(root)
+    msg_window.title("已复制")
+    msg_window.geometry("300x100")
+    msg_window.transient(root)
+    msg_window.grab_set()
+    
+    # 消息内容
+    label = tk.Label(msg_window, text="汇报内容已复制到剪贴板！", padx=20, pady=20)
+    label.pack()
+    
+    # 3秒后自动关闭
+    msg_window.after(3000, msg_window.destroy)
 def clear_inputs():
     for t in input_widgets.values():
         t.delete("1.0", tk.END)
     save_all_inputs()
 def show_stats():
-    messagebox.showinfo("统计分析", analyze_report_stat())
+    stats = analyze_report_stat()
+    # 创建自动关闭的消息框
+    msg_window = tk.Toplevel(root)
+    msg_window.title("统计分析")
+    msg_window.geometry("400x200")
+    msg_window.transient(root)
+    msg_window.grab_set()
+    
+    # 消息内容
+    label = tk.Label(msg_window, text=stats, padx=20, pady=20, justify=tk.LEFT)
+    label.pack()
+    
+    # 5秒后自动关闭
+    msg_window.after(5000, msg_window.destroy)
 def show_history_list():
     win = tk.Toplevel(root)
     win.title("历史汇报记录")
@@ -410,7 +435,19 @@ def show_history_list():
         user_var.set(data.get("user", ""))
         dept_var.set(data.get("dept", ""))
         date_var.set(data.get("date", logical_today()))
-        messagebox.showinfo("导入成功","已将历史内容填入当前输入，检查无误后可直接生成或编辑。")
+        # 创建自动关闭的消息框
+        msg_window = tk.Toplevel(root)
+        msg_window.title("导入成功")
+        msg_window.geometry("400x100")
+        msg_window.transient(root)
+        msg_window.grab_set()
+        
+        # 消息内容
+        label = tk.Label(msg_window, text="已将历史内容填入当前输入，检查无误后可直接生成或编辑。", padx=20, pady=20)
+        label.pack()
+        
+        # 3秒后自动关闭
+        msg_window.after(3000, msg_window.destroy)
         win.destroy()
     lbox.bind("<Double-Button-1>", import_to_inputs)
 
@@ -427,10 +464,34 @@ def open_template_editor():
         try:
             v = json.loads(lsttxt.get("1.0", tk.END))
             save_template(v)
-            messagebox.showinfo("成功", "保存成功，重启软件生效！")
+            # 创建自动关闭的消息框
+            msg_window = tk.Toplevel(root)
+            msg_window.title("成功")
+            msg_window.geometry("300x100")
+            msg_window.transient(root)
+            msg_window.grab_set()
+            
+            # 消息内容
+            label = tk.Label(msg_window, text="保存成功，重启软件生效！", padx=20, pady=20)
+            label.pack()
+            
+            # 3秒后自动关闭
+            msg_window.after(3000, msg_window.destroy)
             win.destroy()
         except Exception as ex:
-            messagebox.showerror("格式错误", "请确保JSON格式正确！\n" + str(ex))
+            # 创建自动关闭的错误消息框
+            msg_window = tk.Toplevel(root)
+            msg_window.title("格式错误")
+            msg_window.geometry("400x150")
+            msg_window.transient(root)
+            msg_window.grab_set()
+            
+            # 消息内容
+            label = tk.Label(msg_window, text=f"请确保JSON格式正确！\n{str(ex)}", padx=20, pady=20, justify=tk.LEFT)
+            label.pack()
+            
+            # 5秒后自动关闭
+            msg_window.after(5000, msg_window.destroy)
     ttk.Button(win, text="保存并关闭", command=_save).pack(pady=5)
 
 def smart_suggest():
@@ -440,7 +501,59 @@ def smart_suggest():
         content.append(v)
     fulltext = "\n".join(content)
     advice = make_suggestion(fulltext)
-    messagebox.showinfo("智能建议", advice)
+    # 创建自动关闭的消息框
+    msg_window = tk.Toplevel(root)
+    msg_window.title("智能建议")
+    msg_window.geometry("400x200")
+    msg_window.transient(root)
+    msg_window.grab_set()
+    
+    # 消息内容
+    label = tk.Label(msg_window, text=advice, padx=20, pady=20, justify=tk.LEFT)
+    label.pack()
+    
+    # 5秒后自动关闭
+    msg_window.after(5000, msg_window.destroy)
+
+def send_to_wechat_wrapper():
+    """发送到企微的包装函数，确保先有内容再发送"""
+    # 先检查是否有内容
+    content = output_text.get("1.0", tk.END).strip()
+    if not content:
+        # 如果没有内容，先生成汇报
+        generate_report(False)
+        content = output_text.get("1.0", tk.END).strip()
+    
+    if content:
+        success = send_to_wechat(content)
+        if success:
+            # 创建自动关闭的消息框
+            msg_window = tk.Toplevel(root)
+            msg_window.title("发送成功")
+            msg_window.geometry("300x100")
+            msg_window.transient(root)
+            msg_window.grab_set()
+            
+            # 消息内容
+            label = tk.Label(msg_window, text="已复制内容并打开企业微信！", padx=20, pady=20)
+            label.pack()
+            
+            # 3秒后自动关闭
+            msg_window.after(3000, msg_window.destroy)
+        else:
+            # 创建自动关闭的错误消息框
+            msg_window = tk.Toplevel(root)
+            msg_window.title("发送失败")
+            msg_window.geometry("300x100")
+            msg_window.transient(root)
+            msg_window.grab_set()
+            
+            # 消息内容
+            label = tk.Label(msg_window, text="发送到企微失败，请检查企微是否安装！", padx=20, pady=20)
+            label.pack()
+            
+            # 3秒后自动关闭
+            msg_window.after(3000, msg_window.destroy)
 
 # 主按钮
 main_buttons = tk.Frame(btnframe, bg="#f5f7fa")
@@ -456,7 +569,7 @@ wechat_buttons = tk.Frame(btnframe, bg="#f5f7fa")
 wechat_buttons.grid(row=1, column=0, columnspan=9, pady=5)
 
 ttk.Button(wechat_buttons, text="打开企微", command=open_wechat).pack(side=tk.LEFT, padx=8)
-ttk.Button(wechat_buttons, text="发送到企微", command=lambda: send_to_wechat(output_text.get("1.0", tk.END))).pack(side=tk.LEFT, padx=8)
+ttk.Button(wechat_buttons, text="发送到企微", command=send_to_wechat_wrapper).pack(side=tk.LEFT, padx=8)
 
 # 其他功能按钮
 other_buttons = tk.Frame(btnframe, bg="#f5f7fa")
@@ -464,7 +577,6 @@ other_buttons.grid(row=2, column=0, columnspan=9, pady=5)
 
 ttk.Button(other_buttons, text="查历史", command=show_history_list).pack(side=tk.LEFT, padx=8)
 ttk.Button(other_buttons, text="智能建议", command=smart_suggest).pack(side=tk.LEFT, padx=8)
-ttk.Button(other_buttons, text="统计分析", command=show_stats).pack(side=tk.LEFT, padx=8)
 ttk.Button(other_buttons, text="模板定制", command=open_template_editor).pack(side=tk.LEFT, padx=8)
 
 def generate_report(autocopy=False):
