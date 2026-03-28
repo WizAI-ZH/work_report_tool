@@ -7,7 +7,7 @@ from version import get_version_string, increment_version, load_version, save_ve
 PROJECT_NAME = "WorkReportGenerator"
 MAIN_SCRIPT = "main.py"
 ICON_FILE = "wiz_logo.png"
-RESOURCES = ["wiz_logo.png", "version.json"]
+RESOURCES = ["wiz_logo.png", "version.json", "task_tracker.py", "wechat_integration.py"]
 
 
 def run_command(cmd, cwd=None):

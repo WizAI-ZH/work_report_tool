@@ -3,6 +3,8 @@ from tkinter import messagebox, simpledialog, ttk
 import os, json, re
 from datetime import datetime, timedelta
 from version import get_version_info
+from task_tracker import generate_today_work, parse_task_input, add_task
+from wechat_integration import open_wechat, send_to_wechat
 
 ROOT_DIR = "工作汇报记录"
 CFG_FILE = os.path.join(ROOT_DIR, "report_config.json")
@@ -217,20 +219,26 @@ def load_all_inputs():
             input_widgets[k].delete("1.0", tk.END)
 
         # ⬇⬇⬇这部分实现“跨业务日自动预填”⬇⬇⬇
-        yesterday = (datetime.now() - timedelta(days=1) if datetime.now().hour >= 4 else datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
-        prev_key = f"{user_var.get()}__{dept_var.get()}__{yesterday}"
-        prev = allcache.get(prev_key)
-        if prev:
-            # 举例：把昨天的“明日计划”放到今天“今日完成情况”
-            y_tomorrow = prev["fields"].get("tomorrow_plan", "")
-            if y_tomorrow and "today_work" in input_widgets:
-                input_widgets["today_work"].insert("1.0", y_tomorrow)
+        # 1. 尝试从任务跟踪系统生成今日工作内容
+        today_work_content = generate_today_work()
+        if today_work_content and "today_work" in input_widgets:
+            input_widgets["today_work"].insert("1.0", today_work_content)
+        else:
+            # 2. 如果任务跟踪系统没有数据，使用旧的方式
+            yesterday = (datetime.now() - timedelta(days=1) if datetime.now().hour >= 4 else datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
+            prev_key = f"{user_var.get()}__{dept_var.get()}__{yesterday}"
+            prev = allcache.get(prev_key)
+            if prev:
+                # 把昨天的“明日计划”放到今天“今日完成情况”
+                y_tomorrow = prev["fields"].get("tomorrow_plan", "")
+                if y_tomorrow and "today_work" in input_widgets:
+                    input_widgets["today_work"].insert("1.0", y_tomorrow)
 
 # ================== GUI设计 ==================
 root = tk.Tk()
 version_info = get_version_info()
 root.title(f"工作汇报全功能生成器 - {version_info['version']}")
-root.geometry("820x730")
+root.geometry("950x730")
 style = ttk.Style()
 style.theme_use("clam")
 root.config(bg="#f5f7fa")
@@ -269,11 +277,34 @@ for item in template:
 def bind_autosave(widget):
     widget.bind("<KeyRelease>", lambda e: save_all_inputs())
     widget.bind("<FocusOut>", lambda e: save_all_inputs())
+    # 添加快捷键支持
+    widget.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
+    widget.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
+    widget.bind("<Control-c>", lambda e: copy_now())  # Ctrl+C 复制内容
+
+# 任务解析功能
+def parse_and_add_task(event):
+    widget = event.widget
+    content = widget.get("1.0", tk.END).strip()
+    # 检查是否是任务格式
+    task_data = parse_task_input(content)
+    if task_data:
+        # 添加任务到任务跟踪系统
+        add_task(
+            task_data["name"],
+            task_data["progress"],
+            task_data["completed"],
+            task_data["planned"]
+        )
+        messagebox.showinfo("任务添加成功", f"已添加任务：{task_data['name']}")
+
 user_var.trace_add("write", lambda *a: save_all_inputs())
 dept_var.trace_add("write", lambda *a: save_all_inputs())
 date_var.trace_add("write", lambda *a: save_all_inputs())
 for w in input_widgets.values():
     bind_autosave(w)
+    # 绑定任务解析功能
+    w.bind("<Control-return>", parse_and_add_task)
 
 # ===== 输出展示区 =====
 outLf = tk.LabelFrame(root, text="生成的汇报内容", font=("微软雅黑", 12, "bold"), bg="#f8fcff")
@@ -377,6 +408,8 @@ ttk.Button(btnframe, text="统计分析", command=show_stats).grid(row=0,column=
 ttk.Button(btnframe, text="查历史", command=show_history_list).grid(row=0,column=4,padx=8)
 ttk.Button(btnframe, text="模板定制", command=open_template_editor).grid(row=0,column=5,padx=8)
 ttk.Button(btnframe, text="智能建议", command=smart_suggest).grid(row=0,column=6,padx=8)
+ttk.Button(btnframe, text="打开企微", command=open_wechat).grid(row=0,column=7,padx=8)
+ttk.Button(btnframe, text="发送到企微", command=lambda: send_to_wechat(output_text.get("1.0", tk.END))).grid(row=0,column=8,padx=8)
 
 def generate_report(autocopy=False):
     user, dept, date = user_var.get().strip(), dept_var.get().strip(), date_var.get().strip()
