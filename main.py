@@ -238,7 +238,7 @@ def load_all_inputs():
 root = tk.Tk()
 version_info = get_version_info()
 root.title(f"工作汇报全功能生成器 - {version_info['version']}")
-root.geometry("950x730")
+root.geometry("950x800")
 style = ttk.Style()
 style.theme_use("clam")
 root.config(bg="#f5f7fa")
@@ -442,15 +442,30 @@ def smart_suggest():
     advice = make_suggestion(fulltext)
     messagebox.showinfo("智能建议", advice)
 
-ttk.Button(btnframe, text="生成汇报", command=lambda: generate_report(True), style="Primary.TButton").grid(row=0,column=0,padx=12)
-ttk.Button(btnframe, text="复制内容", command=copy_now).grid(row=0,column=1,padx=8)
-ttk.Button(btnframe, text="清空重写", command=clear_inputs).grid(row=0,column=2,padx=8)
-ttk.Button(btnframe, text="统计分析", command=show_stats).grid(row=0,column=3,padx=8)
-ttk.Button(btnframe, text="查历史", command=show_history_list).grid(row=0,column=4,padx=8)
-ttk.Button(btnframe, text="模板定制", command=open_template_editor).grid(row=0,column=5,padx=8)
-ttk.Button(btnframe, text="智能建议", command=smart_suggest).grid(row=0,column=6,padx=8)
-ttk.Button(btnframe, text="打开企微", command=open_wechat).grid(row=0,column=7,padx=8)
-ttk.Button(btnframe, text="发送到企微", command=lambda: send_to_wechat(output_text.get("1.0", tk.END))).grid(row=0,column=8,padx=8)
+# 主按钮
+main_buttons = tk.Frame(btnframe, bg="#f5f7fa")
+main_buttons.grid(row=0, column=0, columnspan=9, pady=5)
+
+# 核心功能按钮
+ttk.Button(main_buttons, text="生成汇报", command=lambda: generate_report(True), style="Primary.TButton").pack(side=tk.LEFT, padx=8)
+ttk.Button(main_buttons, text="复制内容", command=copy_now).pack(side=tk.LEFT, padx=8)
+ttk.Button(main_buttons, text="清空重写", command=clear_inputs).pack(side=tk.LEFT, padx=8)
+
+# 企业微信相关按钮
+wechat_buttons = tk.Frame(btnframe, bg="#f5f7fa")
+wechat_buttons.grid(row=1, column=0, columnspan=9, pady=5)
+
+ttk.Button(wechat_buttons, text="打开企微", command=open_wechat).pack(side=tk.LEFT, padx=8)
+ttk.Button(wechat_buttons, text="发送到企微", command=lambda: send_to_wechat(output_text.get("1.0", tk.END))).pack(side=tk.LEFT, padx=8)
+
+# 其他功能按钮
+other_buttons = tk.Frame(btnframe, bg="#f5f7fa")
+other_buttons.grid(row=2, column=0, columnspan=9, pady=5)
+
+ttk.Button(other_buttons, text="查历史", command=show_history_list).pack(side=tk.LEFT, padx=8)
+ttk.Button(other_buttons, text="智能建议", command=smart_suggest).pack(side=tk.LEFT, padx=8)
+ttk.Button(other_buttons, text="统计分析", command=show_stats).pack(side=tk.LEFT, padx=8)
+ttk.Button(other_buttons, text="模板定制", command=open_template_editor).pack(side=tk.LEFT, padx=8)
 
 def generate_report(autocopy=False):
     user, dept, date = user_var.get().strip(), dept_var.get().strip(), date_var.get().strip()
@@ -489,7 +504,19 @@ def generate_report(autocopy=False):
     if autocopy:
         root.clipboard_clear()
         root.clipboard_append(report_full)
-        messagebox.showinfo("已复制", "汇报内容已生成并复制到剪贴板！")
+        # 创建自动关闭的消息框
+        msg_window = tk.Toplevel(root)
+        msg_window.title("已复制")
+        msg_window.geometry("300x100")
+        msg_window.transient(root)
+        msg_window.grab_set()
+        
+        # 消息内容
+        label = tk.Label(msg_window, text="汇报内容已生成并复制到剪贴板！", padx=20, pady=20)
+        label.pack()
+        
+        # 3秒后自动关闭
+        msg_window.after(3000, msg_window.destroy)
     save_all_inputs()
 
 

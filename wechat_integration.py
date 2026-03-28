@@ -75,11 +75,14 @@ def open_wechat_chat(chat_name=None):
 def is_wechat_running():
     """检查企业微信是否正在运行"""
     try:
-        # 使用tasklist命令检查企业微信进程
+        # 使用tasklist命令检查企业微信进程，隐藏窗口
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         result = subprocess.run(
             ["tasklist", "/FI", "IMAGENAME eq WXWork.exe"],
             capture_output=True,
-            text=True
+            text=True,
+            startupinfo=startupinfo
         )
         return "WXWork.exe" in result.stdout
     except Exception:
@@ -110,5 +113,6 @@ def send_to_wechat(content):
             open_wechat()
         
         return True
-    except Exception:
+    except Exception as e:
+        print(f"发送到企微失败: {e}")
         return False
