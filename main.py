@@ -305,19 +305,34 @@ def parse_and_add_task(event):
 # Tab键任务输入功能
 def task_tab_input(event):
     widget = event.widget
-    content = widget.get("1.0", tk.END).strip()
+    cursor_pos = widget.index(tk.INSERT)
+    line_start = widget.index(f"{cursor_pos} linestart")
+    line_end = widget.index(f"{cursor_pos} lineend")
+    current_line = widget.get(line_start, line_end)
     
     # 检查当前输入状态
-    lines = content.split('\n')
-    current_line = widget.get(tk.INSERT + " linestart", tk.INSERT + " lineend").strip()
-    
-    # 检查是否是任务格式的开始
-    if not current_line:
-        # 新任务开始
+    if not current_line.strip():
+        # 新任务开始，插入模板
         widget.insert(tk.INSERT, "任务名称（进度，完成内容，准备做的内容）")
-    elif "（" in current_line and "）" not in current_line:
-        # 正在输入任务格式，按Tab键自动添加逗号
-        widget.insert(tk.INSERT, ", ")
+        # 将光标定位到任务名称位置
+        widget.icursor(line_start + 4)  # 定位到"任务名称"后面
+    else:
+        # 分析当前行的状态
+        if "（" not in current_line:
+            # 任务名称输入完成，添加左括号
+            widget.insert(tk.INSERT, "（")
+        elif "）" not in current_line:
+            # 正在输入任务详情
+            parts = current_line.split("，")
+            if len(parts) == 1:
+                # 进度输入完成，添加逗号
+                widget.insert(tk.INSERT, "，")
+            elif len(parts) == 2:
+                # 完成内容输入完成，添加逗号
+                widget.insert(tk.INSERT, "，")
+            elif len(parts) == 3:
+                # 准备做的内容输入完成，添加右括号
+                widget.insert(tk.INSERT, "）")
     
     # 阻止默认Tab行为
     return "break"
