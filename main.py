@@ -304,7 +304,7 @@ date_var.trace_add("write", lambda *a: save_all_inputs())
 for w in input_widgets.values():
     bind_autosave(w)
     # 绑定任务解析功能
-    w.bind("<Control-return>", parse_and_add_task)
+    w.bind("<Control-Return>", parse_and_add_task)
 
 # ===== 输出展示区 =====
 outLf = tk.LabelFrame(root, text="生成的汇报内容", font=("微软雅黑", 12, "bold"), bg="#f8fcff")
