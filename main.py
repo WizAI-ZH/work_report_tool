@@ -515,27 +515,43 @@ def ai_suggest():
         msg_window.after(3000, msg_window.destroy)
         return
     
-    # 构建提示词
+    # 构建提示词 - 明确说明汇报格式要求
     prompt = f"""请优化以下工作汇报内容，使其更加专业、简洁、有条理。
 
-今日工作完成情况：
+【当前填写的内容】
+
+1、今日工作完成情况：
 {today_content if today_content else '无'}
 
-明日工作计划：
+2、明日工作计划：
 {tomorrow_content if tomorrow_content else '无'}
 
-请按照以下格式输出优化后的内容：
+【格式要求 - 必须严格遵守】
+
+输出格式必须如下：
+
 1、今日工作完成情况；
-[优化后的内容，每条用a. b. c.等编号]
+a. 任务名称（进度百分比，已完成的具体内容，明天准备做的内容）
+b. 任务名称（进度百分比，已完成的具体内容，明天准备做的内容）
+c. ...
 
 2、明日工作计划；
-[优化后的内容，每条用a. b. c.等编号]
+a. 任务名称（预计进度，计划完成内容，后续安排）
+b. 任务名称（预计进度，计划完成内容，后续安排）
+c. ...
 
-要求：
+【格式说明】
+- 每个任务必须包含：任务名称 + 括号内的三项内容（用逗号分隔）
+- 括号内格式：（进度，已完成内容，准备做的内容）
+- 示例：完成XX模块开发（50%，已完成核心功能开发，明天进行接口联调）
+- 如果没有某项内容，填写"无"
+- 保持简洁，每条任务一行
+
+【优化要求】
 - 使用简洁的短句，条理清晰
 - 适当量化工作成效，例如"完成XX模块开发50%"
 - 明日计划明确到具体任务或目标
-- 保持原有的任务格式：任务名称（进度，完成内容，准备做的内容）"""
+- 严格保持上述格式，不要添加额外说明"""
     
     # 创建等待窗口
     wait_window = tk.Toplevel(root)
@@ -547,7 +563,16 @@ def ai_suggest():
     wait_label.pack()
     root.update()
     
+    # 调试信息文件路径
+    debug_file = os.path.join(ROOT_DIR, "ai_debug.log")
+    
     try:
+        # 记录调试信息
+        with open(debug_file, "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*50}\n")
+            f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"开始调用DeepSeek API...\n")
+        
         # 调用DeepSeek API
         api_key = "sk-2RcxkkQVN5C9XfTi2umncD2r5VXqL7ngjDTBSrm77JGJhwIy"
         headers = {
@@ -557,12 +582,16 @@ def ai_suggest():
         data = {
             "model": "deepseek-chat",
             "messages": [
-                {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。"},
+                {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。你必须严格按照用户要求的格式输出，每个任务必须包含任务名称和括号内的三项内容。"},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7,
             "max_tokens": 2000
         }
+        
+        with open(debug_file, "a", encoding="utf-8") as f:
+            f.write(f"请求URL: https://api.deepseek.com/v1/chat/completions\n")
+            f.write(f"请求模型: deepseek-chat\n")
         
         response = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
@@ -571,24 +600,46 @@ def ai_suggest():
             timeout=30
         )
         
+        with open(debug_file, "a", encoding="utf-8") as f:
+            f.write(f"响应状态码: {response.status_code}\n")
+        
         wait_window.destroy()
         
         if response.status_code == 200:
             result = response.json()
             ai_content = result["choices"][0]["message"]["content"]
             
+            with open(debug_file, "a", encoding="utf-8") as f:
+                f.write(f"API调用成功！\n")
+                f.write(f"AI回复内容:\n{ai_content[:500]}...\n")
+            
             # 显示AI建议窗口
             show_ai_suggestion_window(ai_content, today_work, tomorrow_plan)
         else:
+            error_msg = f"API调用失败: HTTP {response.status_code}"
+            try:
+                error_detail = response.json()
+                error_msg += f", 详情: {error_detail}"
+            except:
+                error_msg += f", 响应内容: {response.text[:200]}"
+            
+            with open(debug_file, "a", encoding="utf-8") as f:
+                f.write(f"{error_msg}\n")
+            
             # API调用失败，使用本地建议
-            fallback_suggestion()
+            fallback_suggestion(error_msg)
             
     except Exception as e:
         wait_window.destroy()
+        error_msg = f"API调用异常: {str(e)}"
+        
+        with open(debug_file, "a", encoding="utf-8") as f:
+            f.write(f"{error_msg}\n")
+        
         # API调用失败，使用本地建议
-        fallback_suggestion()
+        fallback_suggestion(error_msg)
 
-def fallback_suggestion():
+def fallback_suggestion(error_msg=""):
     """API失败时的本地建议"""
     content = []
     for k in ["today_work","tomorrow_plan"]:
@@ -597,16 +648,36 @@ def fallback_suggestion():
     fulltext = "\n".join(content)
     advice = make_suggestion(fulltext)
     
-    msg_window = tk.Toplevel(root)
-    msg_window.title("AI建议（本地模式）")
-    msg_window.geometry("400x200")
-    msg_window.transient(root)
-    msg_window.grab_set()
+    # 显示错误信息和本地建议
+    win = tk.Toplevel(root)
+    win.title("AI建议（本地模式）")
+    win.geometry("500x350")
+    win.transient(root)
+    win.grab_set()
     
-    label = tk.Label(msg_window, text=advice, padx=20, pady=20, justify=tk.LEFT)
-    label.pack()
+    # 错误信息区域
+    if error_msg:
+        error_frame = tk.LabelFrame(win, text="API调用失败原因（调试信息）", font=("微软雅黑", 10))
+        error_frame.pack(fill="x", padx=20, pady=10)
+        
+        error_text = tk.Text(error_frame, font=("Consolas", 9), height=4, wrap=tk.WORD)
+        error_text.pack(fill="x", padx=5, pady=5)
+        error_text.insert("1.0", error_msg)
+        error_text.config(state="disabled")
     
-    msg_window.after(5000, msg_window.destroy)
+    # 本地建议区域
+    advice_frame = tk.LabelFrame(win, text="本地建议", font=("微软雅黑", 10))
+    advice_frame.pack(fill="both", expand=True, padx=20, pady=10)
+    
+    advice_label = tk.Label(advice_frame, text=advice, padx=10, pady=10, justify=tk.LEFT, wraplength=400)
+    advice_label.pack(fill="both", expand=True)
+    
+    # 调试文件提示
+    debug_file = os.path.join(ROOT_DIR, "ai_debug.log")
+    tk.Label(win, text=f"详细调试信息已保存到: {debug_file}", font=("微软雅黑", 9), fg="gray").pack(pady=5)
+    
+    # 关闭按钮
+    ttk.Button(win, text="关闭", command=win.destroy).pack(pady=10)
 
 def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget):
     """显示AI建议窗口，用户可以接受或拒绝"""
