@@ -81,13 +81,16 @@ def show_ai_config_dialog(first_time=False):
     info_frame = tk.LabelFrame(win, text="免费API Key获取", font=("微软雅黑", 10))
     info_frame.pack(fill="x", padx=20, pady=10)
     
-    info_text = """您可以免费获取API Key：
-https://github.com/chatanywhere/GPT_API_free
-
-推荐代理URL：https://api.chatanywhere.tech/v1/chat/completions"""
+    # 使用Text组件替代Label，允许用户选择和复制文本
+    info_text = "您可以免费获取API Key：\nhttps://github.com/chatanywhere/GPT_API_free\n\n推荐代理URL：https://api.chatanywhere.tech/v1/chat/completions"
     
-    info_label = tk.Label(info_frame, text=info_text, font=("Consolas", 9), justify=tk.LEFT, fg="blue")
-    info_label.pack(padx=10, pady=10)
+    info_text_widget = tk.Text(info_frame, font=("Consolas", 9), wrap=tk.WORD, height=4, bg="#f0f0f0", relief="flat")
+    info_text_widget.pack(padx=10, pady=10, fill="x")
+    info_text_widget.insert("1.0", info_text)
+    info_text_widget.config(state="disabled", fg="blue")
+    
+    # 提示用户可以复制
+    tk.Label(info_frame, text="提示：您可以选择并复制上面的链接", font=("微软雅黑", 8), fg="gray").pack(pady=5)
     
     # 配置表单
     form_frame = tk.Frame(win)
@@ -96,7 +99,7 @@ https://github.com/chatanywhere/GPT_API_free
     # API Key
     tk.Label(form_frame, text="API Key:", font=("微软雅黑", 10)).grid(row=0, column=0, sticky="w", pady=5)
     api_key_var = tk.StringVar(value=config.get("api_key", ""))
-    api_key_entry = tk.Entry(form_frame, textvariable=api_key_var, font=("Consolas", 10), width=50, show="*")
+    api_key_entry = tk.Entry(form_frame, textvariable=api_key_var, font=("Consolas", 10), width=45, show="*")
     api_key_entry.grid(row=0, column=1, pady=5)
     
     # 显示/隐藏API Key
@@ -108,13 +111,13 @@ https://github.com/chatanywhere/GPT_API_free
             api_key_entry.config(show="*")
             show_btn.config(text="显示")
     
-    show_btn = tk.Button(form_frame, text="显示", command=toggle_show_key)
+    show_btn = tk.Button(form_frame, text="显示", command=toggle_show_key, width=5)
     show_btn.grid(row=0, column=2, padx=5)
     
     # API URL
     tk.Label(form_frame, text="API URL:", font=("微软雅黑", 10)).grid(row=1, column=0, sticky="w", pady=5)
     api_url_var = tk.StringVar(value=config.get("api_url", DEFAULT_AI_CONFIG["api_url"]))
-    tk.Entry(form_frame, textvariable=api_url_var, font=("Consolas", 10), width=50).grid(row=1, column=1, pady=5)
+    tk.Entry(form_frame, textvariable=api_url_var, font=("Consolas", 10), width=45).grid(row=1, column=1, pady=5)
     
     # 模型选择 - 使用Combobox支持自定义输入
     tk.Label(form_frame, text="模型:", font=("微软雅黑", 10)).grid(row=2, column=0, sticky="w", pady=5)
@@ -123,7 +126,7 @@ https://github.com/chatanywhere/GPT_API_free
     saved_models = config.get("available_models", DEFAULT_AI_CONFIG["available_models"])
     model_combo = ttk.Combobox(form_frame, textvariable=model_var, 
                                values=saved_models, 
-                               font=("微软雅黑", 10), width=48)
+                               font=("微软雅黑", 10), width=43)
     model_combo.grid(row=2, column=1, pady=5)
     # 提示用户可以输入自定义模型
     tk.Label(form_frame, text="(可手动输入或从API获取)", font=("微软雅黑", 8), fg="gray").grid(row=3, column=1, sticky="w")
@@ -168,24 +171,40 @@ https://github.com/chatanywhere/GPT_API_free
             
             if response.status_code == 200:
                 data = response.json()
-                models = [m.get("id", "") for m in data.get("data", [])]
-                # 过滤掉嵌入模型等不适合的模型
-                chat_models = [m for m in models if any(keyword in m.lower() for keyword in 
-                              ['gpt', 'claude', 'deepseek', 'qwen', 'glm', 'chat', 'llama', 'mistral'])]
-                
-                if chat_models:
-                    model_combo['values'] = chat_models
-                    messagebox.showinfo("成功", f"已获取 {len(chat_models)} 个可用模型！")
+                # 检查data是否为字典且包含data键
+                if isinstance(data, dict) and 'data' in data:
+                    models = []
+                    for m in data.get("data", []):
+                        if isinstance(m, dict):
+                            model_id = m.get("id", "")
+                            if model_id:
+                                models.append(model_id)
+                    # 过滤掉嵌入模型等不适合的模型
+                    chat_models = [m for m in models if any(keyword in m.lower() for keyword in 
+                                  ['gpt', 'claude', 'deepseek', 'qwen', 'glm', 'chat', 'llama', 'mistral'])]
+                    
+                    if chat_models:
+                        model_combo['values'] = chat_models
+                        messagebox.showinfo("成功", f"已获取 {len(chat_models)} 个可用模型！")
+                    else:
+                        messagebox.showwarning("提示", "未找到合适的聊天模型，使用默认列表。")
                 else:
-                    messagebox.showwarning("提示", "未找到合适的聊天模型，使用默认列表。")
+                    messagebox.showerror("失败", f"获取模型列表失败：\nAPI返回格式错误\n\n您可以手动输入模型名称。")
             else:
-                error_msg = response.json().get("error", {}).get("message", "未知错误")
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data, dict):
+                        error_msg = error_data.get("error", {}).get("message", "未知错误")
+                    else:
+                        error_msg = str(error_data)
+                except Exception as e:
+                    error_msg = f"解析错误：{str(e)}"
                 messagebox.showerror("失败", f"获取模型列表失败：\n{error_msg}\n\n您可以手动输入模型名称。")
         except Exception as e:
             fetch_win.destroy()
             messagebox.showerror("失败", f"获取模型列表失败：\n{str(e)}\n\n您可以手动输入模型名称。")
     
-    tk.Button(form_frame, text="获取模型", command=fetch_models, font=("微软雅黑", 9), padx=5).grid(row=2, column=2, padx=5)
+    tk.Button(form_frame, text="获取模型", command=fetch_models, font=("微软雅黑", 9), width=8, padx=5).grid(row=2, column=2, padx=5)
     
     # 按钮
     btn_frame = tk.Frame(win)
@@ -854,12 +873,12 @@ def ai_suggest():
     # 根据是否休息调整明日计划部分的提示
     if force_rest:
         tomorrow_plan_prompt = """2、明日工作计划；
-a. 休息（无，无，无）
+a. 休息
 
 【重要格式说明】
 - 今日工作：括号内格式为（实际完成进度，已完成内容，明天准备做的内容）
   示例：完成XX模块开发（50%，已完成核心功能开发，明天进行接口联调）
-- 明日计划：明天是休息日，统一写"休息（无，无，无）"
+- 明日计划：明天是休息日，统一写"休息"两个字，不需要括号和其他内容
 - 未完成的工作顺延到下一个工作日，不需要在明日计划中体现"""
     else:
         tomorrow_plan_prompt = """2、明日工作计划；
