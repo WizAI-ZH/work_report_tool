@@ -1,24 +1,38 @@
 import json
 import os
+import sys
 
 VERSION_FILE = 'version.json'
+
+# 默认版本号（当无法读取version.json时使用）
+DEFAULT_VERSION = {
+    'major': 1,
+    'minor': 0,
+    'patch': 11,
+    'build': 0,
+    'description': '工作汇报输出器'
+}
 
 
 def load_version():
     """加载版本信息"""
-    if os.path.exists(VERSION_FILE):
-        try:
-            with open(VERSION_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {
-        'major': 1,
-        'minor': 0,
-        'patch': 0,
-        'build': 0,
-        'description': '工作汇报输出器'
-    }
+    # 尝试多个路径查找version.json
+    possible_paths = [
+        VERSION_FILE,  # 当前目录
+        os.path.join(os.path.dirname(sys.executable), VERSION_FILE),  # exe所在目录
+        os.path.join(os.path.dirname(__file__), VERSION_FILE),  # 脚本所在目录
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                continue
+    
+    # 如果都找不到，返回默认版本
+    return DEFAULT_VERSION
 
 
 def save_version(version):

@@ -573,8 +573,9 @@ c. ...
             f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"开始调用DeepSeek API...\n")
         
-        # 调用DeepSeek API
+        # 调用DeepSeek API - 使用新的API Key
         api_key = "sk-2RcxkkQVN5C9XfTi2umncD2r5VXqL7ngjDTBSrm77JGJhwIy"
+        # 注意：如果API Key仍然无效，需要联系API提供商获取新的Key
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
