@@ -573,15 +573,14 @@ c. ...
             f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"开始调用DeepSeek API...\n")
         
-        # 调用DeepSeek API - 使用新的API Key
+        # 调用DeepSeek API - 使用ChatAnywhere代理
         api_key = "sk-2RcxkkQVN5C9XfTi2umncD2r5VXqL7ngjDTBSrm77JGJhwIy"
-        # 注意：如果API Key仍然无效，需要联系API提供商获取新的Key
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         data = {
-            "model": "deepseek-chat",
+            "model": "deepseek-v3.2",
             "messages": [
                 {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。你必须严格按照用户要求的格式输出，每个任务必须包含任务名称和括号内的三项内容。"},
                 {"role": "user", "content": prompt}
@@ -590,12 +589,14 @@ c. ...
             "max_tokens": 2000
         }
         
+        api_url = "https://api.chatanywhere.tech/v1/chat/completions"
+        
         with open(debug_file, "a", encoding="utf-8") as f:
-            f.write(f"请求URL: https://api.deepseek.com/v1/chat/completions\n")
-            f.write(f"请求模型: deepseek-chat\n")
+            f.write(f"请求URL: {api_url}\n")
+            f.write(f"请求模型: deepseek-v3.2\n")
         
         response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            api_url,
             headers=headers,
             json=data,
             timeout=30
