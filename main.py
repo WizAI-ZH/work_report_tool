@@ -11,12 +11,206 @@ ROOT_DIR = "工作汇报记录"
 CFG_FILE = os.path.join(ROOT_DIR, "report_config.json")
 HISTORY_DIR = os.path.join(ROOT_DIR, "report_history")
 TEMPLATE_FILE = os.path.join(ROOT_DIR, "report_template.json")
+AI_CONFIG_FILE = os.path.join(ROOT_DIR, "ai_config.json")
 SUGGESTIONS = [
     "建议使用简洁的短句，条理清晰；",
-    "适当量化工作成效，例如“完成XX模块开发50%”；",
+    "适当量化工作成效，例如'完成XX模块开发50%'；",
     "明日计划建议明确到具体任务或目标；",
     "如有困难，建议在计划部分注明需协助资源；",
 ]
+
+# 默认AI配置
+DEFAULT_AI_CONFIG = {
+    "api_key": "",
+    "api_url": "https://api.chatanywhere.tech/v1/chat/completions",
+    "model": "deepseek-v3.2",
+    "available_models": [
+        "deepseek-v3.2",
+        "deepseek-chat",
+        "gpt-3.5-turbo",
+        "gpt-4o",
+        "gpt-4o-mini"
+    ]
+}
+
+def load_ai_config():
+    """加载AI配置"""
+    if os.path.exists(AI_CONFIG_FILE):
+        try:
+            with open(AI_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                # 确保所有必要字段都存在
+                for key in DEFAULT_AI_CONFIG:
+                    if key not in config:
+                        config[key] = DEFAULT_AI_CONFIG[key]
+                return config
+        except Exception:
+            pass
+    return DEFAULT_AI_CONFIG.copy()
+
+def save_ai_config(config):
+    """保存AI配置"""
+    try:
+        with open(AI_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+def show_ai_config_dialog(first_time=False):
+    """显示AI配置对话框
+    
+    Args:
+        first_time: 是否为首次使用
+    """
+    config = load_ai_config()
+    
+    win = tk.Toplevel(root)
+    win.title("AI接口配置" if not first_time else "欢迎使用 - 请配置AI接口")
+    win.geometry("550x450")
+    win.transient(root)
+    win.grab_set()
+    
+    # 说明文字
+    if first_time:
+        tk.Label(win, text="首次使用需要配置AI接口", font=("微软雅黑", 14, "bold"), fg="blue").pack(pady=10)
+    
+    tk.Label(win, text="配置您的AI API信息：", font=("微软雅黑", 11)).pack(pady=5)
+    
+    # 免费API获取提示
+    info_frame = tk.LabelFrame(win, text="免费API Key获取", font=("微软雅黑", 10))
+    info_frame.pack(fill="x", padx=20, pady=10)
+    
+    info_text = """您可以免费获取API Key：
+https://github.com/chatanywhere/GPT_API_free
+
+推荐代理URL：https://api.chatanywhere.tech/v1/chat/completions"""
+    
+    info_label = tk.Label(info_frame, text=info_text, font=("Consolas", 9), justify=tk.LEFT, fg="blue")
+    info_label.pack(padx=10, pady=10)
+    
+    # 配置表单
+    form_frame = tk.Frame(win)
+    form_frame.pack(fill="x", padx=20, pady=10)
+    
+    # API Key
+    tk.Label(form_frame, text="API Key:", font=("微软雅黑", 10)).grid(row=0, column=0, sticky="w", pady=5)
+    api_key_var = tk.StringVar(value=config.get("api_key", ""))
+    api_key_entry = tk.Entry(form_frame, textvariable=api_key_var, font=("Consolas", 10), width=50, show="*")
+    api_key_entry.grid(row=0, column=1, pady=5)
+    
+    # 显示/隐藏API Key
+    def toggle_show_key():
+        if api_key_entry.cget("show") == "*":
+            api_key_entry.config(show="")
+            show_btn.config(text="隐藏")
+        else:
+            api_key_entry.config(show="*")
+            show_btn.config(text="显示")
+    
+    show_btn = tk.Button(form_frame, text="显示", command=toggle_show_key)
+    show_btn.grid(row=0, column=2, padx=5)
+    
+    # API URL
+    tk.Label(form_frame, text="API URL:", font=("微软雅黑", 10)).grid(row=1, column=0, sticky="w", pady=5)
+    api_url_var = tk.StringVar(value=config.get("api_url", DEFAULT_AI_CONFIG["api_url"]))
+    tk.Entry(form_frame, textvariable=api_url_var, font=("Consolas", 10), width=50).grid(row=1, column=1, pady=5)
+    
+    # 模型选择 - 使用Combobox支持自定义输入
+    tk.Label(form_frame, text="模型:", font=("微软雅黑", 10)).grid(row=2, column=0, sticky="w", pady=5)
+    model_var = tk.StringVar(value=config.get("model", DEFAULT_AI_CONFIG["model"]))
+    # Combobox支持从列表选择，也支持手动输入
+    model_combo = ttk.Combobox(form_frame, textvariable=model_var, 
+                               values=DEFAULT_AI_CONFIG["available_models"], 
+                               font=("微软雅黑", 10), width=48)
+    model_combo.grid(row=2, column=1, pady=5)
+    # 提示用户可以输入自定义模型
+    tk.Label(form_frame, text="(可手动输入其他模型)", font=("微软雅黑", 8), fg="gray").grid(row=3, column=1, sticky="w")
+    
+    # 按钮
+    btn_frame = tk.Frame(win)
+    btn_frame.pack(pady=20)
+    
+    def save_config():
+        new_config = {
+            "api_key": api_key_var.get().strip(),
+            "api_url": api_url_var.get().strip(),
+            "model": model_var.get(),
+            "available_models": DEFAULT_AI_CONFIG["available_models"]
+        }
+        
+        if not new_config["api_key"]:
+            messagebox.showwarning("警告", "API Key不能为空！")
+            return
+        
+        if save_ai_config(new_config):
+            messagebox.showinfo("成功", "配置已保存！")
+            win.destroy()
+        else:
+            messagebox.showerror("错误", "保存配置失败！")
+    
+    def cancel():
+        if first_time:
+            messagebox.showwarning("提示", "您需要配置API Key才能使用AI建议功能。")
+        win.destroy()
+    
+    tk.Button(btn_frame, text="保存配置", command=save_config, bg="#4CAF50", fg="white", font=("微软雅黑", 10), padx=20).pack(side=tk.LEFT, padx=10)
+    tk.Button(btn_frame, text="取消", command=cancel, font=("微软雅黑", 10), padx=20).pack(side=tk.LEFT, padx=10)
+    
+    # 测试连接按钮
+    def test_connection():
+        test_config = {
+            "api_key": api_key_var.get().strip(),
+            "api_url": api_url_var.get().strip(),
+            "model": model_var.get()
+        }
+        
+        if not test_config["api_key"]:
+            messagebox.showwarning("警告", "请先输入API Key！")
+            return
+        
+        # 显示测试窗口
+        test_win = tk.Toplevel(win)
+        test_win.title("测试连接")
+        test_win.geometry("300x100")
+        test_win.transient(win)
+        test_win.grab_set()
+        tk.Label(test_win, text="正在测试连接...", font=("微软雅黑", 11)).pack(pady=20)
+        test_win.update()
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {test_config['api_key']}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": test_config["model"],
+                "messages": [{"role": "user", "content": "Hello"}],
+                "max_tokens": 10
+            }
+            
+            response = requests.post(
+                test_config["api_url"],
+                headers=headers,
+                json=data,
+                timeout=10
+            )
+            
+            test_win.destroy()
+            
+            if response.status_code == 200:
+                messagebox.showinfo("成功", "连接测试成功！API配置正确。")
+            else:
+                error_msg = response.json().get("error", {}).get("message", "未知错误")
+                messagebox.showerror("失败", f"连接测试失败：\n{error_msg}")
+        except Exception as e:
+            test_win.destroy()
+            messagebox.showerror("失败", f"连接测试失败：\n{str(e)}")
+    
+    tk.Button(btn_frame, text="测试连接", command=test_connection, font=("微软雅黑", 10), padx=20).pack(side=tk.LEFT, padx=10)
+    
+    if first_time:
+        win.protocol("WM_DELETE_WINDOW", cancel)
 
 if not os.path.exists(ROOT_DIR):
     os.makedirs(ROOT_DIR)
@@ -515,6 +709,28 @@ def ai_suggest():
         msg_window.after(3000, msg_window.destroy)
         return
     
+    # 加载AI配置
+    ai_config = load_ai_config()
+    
+    # 检查是否配置了API Key
+    if not ai_config.get("api_key"):
+        msg_window = tk.Toplevel(root)
+        msg_window.title("提示")
+        msg_window.geometry("400x150")
+        msg_window.transient(root)
+        msg_window.grab_set()
+        
+        tk.Label(msg_window, text="尚未配置AI API Key！\n请先配置API Key才能使用AI建议功能。", 
+                font=("微软雅黑", 11), padx=20, pady=10).pack()
+        
+        def open_config():
+            msg_window.destroy()
+            show_ai_config_dialog(first_time=True)
+        
+        tk.Button(msg_window, text="立即配置", command=open_config, bg="#4CAF50", fg="white", 
+                 font=("微软雅黑", 10), padx=20).pack(pady=10)
+        return
+    
     # 构建提示词 - 明确说明汇报格式要求
     prompt = f"""请优化以下工作汇报内容，使其更加专业、简洁、有条理。
 
@@ -536,14 +752,16 @@ b. 任务名称（进度百分比，已完成的具体内容，明天准备做�
 c. ...
 
 2、明日工作计划；
-a. 任务名称（预计进度，计划完成内容，后续安排）
-b. 任务名称（预计进度，计划完成内容，后续安排）
+a. 任务名称（预期进度，计划完成内容，后续安排）
+b. 任务名称（预期进度，计划完成内容，后续安排）
 c. ...
 
-【格式说明】
-- 每个任务必须包含：任务名称 + 括号内的三项内容（用逗号分隔）
-- 括号内格式：（进度，已完成内容，准备做的内容）
-- 示例：完成XX模块开发（50%，已完成核心功能开发，明天进行接口联调）
+【重要格式说明】
+- 今日工作：括号内格式为（实际完成进度，已完成内容，明天准备做的内容）
+  示例：完成XX模块开发（50%，已完成核心功能开发，明天进行接口联调）
+- 明日计划：括号内格式为（预期进度，计划完成内容，后续安排）
+  注意：明日计划是还未开始的工作，所以应该写"预期进度"而不是确定进度
+  示例：完成XX模块开发（预计50%，计划完成接口联调，进行测试验证）
 - 如果没有某项内容，填写"无"
 - 保持简洁，每条任务一行
 
@@ -553,14 +771,24 @@ c. ...
 - 明日计划明确到具体任务或目标
 - 严格保持上述格式，不要添加额外说明"""
     
-    # 创建等待窗口
+    # 创建带进度条的等待窗口
     wait_window = tk.Toplevel(root)
-    wait_window.title("AI建议")
-    wait_window.geometry("300x100")
+    wait_window.title("AI建议生成中")
+    wait_window.geometry("400x150")
     wait_window.transient(root)
     wait_window.grab_set()
-    wait_label = tk.Label(wait_window, text="正在生成AI建议，请稍候...", padx=20, pady=20)
-    wait_label.pack()
+    
+    tk.Label(wait_window, text="正在生成AI建议，请稍候...", font=("微软雅黑", 12)).pack(pady=10)
+    
+    # 进度条
+    progress = ttk.Progressbar(wait_window, length=350, mode='indeterminate')
+    progress.pack(pady=10)
+    progress.start(10)
+    
+    # 状态标签
+    status_label = tk.Label(wait_window, text="正在连接AI服务...", font=("微软雅黑", 10), fg="gray")
+    status_label.pack(pady=5)
+    
     root.update()
     
     # 调试信息文件路径
@@ -571,35 +799,39 @@ c. ...
         with open(debug_file, "a", encoding="utf-8") as f:
             f.write(f"\n{'='*50}\n")
             f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"开始调用DeepSeek API...\n")
+            f.write(f"开始调用AI API...\n")
         
-        # 调用DeepSeek API - 使用ChatAnywhere代理
-        api_key = "sk-2RcxkkQVN5C9XfTi2umncD2r5VXqL7ngjDTBSrm77JGJhwIy"
+        # 使用用户配置的API
+        api_key = ai_config["api_key"]
+        api_url = ai_config.get("api_url", DEFAULT_AI_CONFIG["api_url"])
+        model = ai_config.get("model", DEFAULT_AI_CONFIG["model"])
+        
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         data = {
-            "model": "deepseek-v3.2",
+            "model": model,
             "messages": [
-                {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。你必须严格按照用户要求的格式输出，每个任务必须包含任务名称和括号内的三项内容。"},
+                {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。你必须严格按照用户要求的格式输出，今日工作使用实际进度，明日计划使用预期进度。"},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7,
             "max_tokens": 2000
         }
         
-        api_url = "https://api.chatanywhere.tech/v1/chat/completions"
-        
         with open(debug_file, "a", encoding="utf-8") as f:
             f.write(f"请求URL: {api_url}\n")
-            f.write(f"请求模型: deepseek-v3.2\n")
+            f.write(f"请求模型: {model}\n")
+        
+        status_label.config(text="正在生成内容...")
+        root.update()
         
         response = requests.post(
             api_url,
             headers=headers,
             json=data,
-            timeout=30
+            timeout=60
         )
         
         with open(debug_file, "a", encoding="utf-8") as f:
@@ -615,8 +847,12 @@ c. ...
                 f.write(f"API调用成功！\n")
                 f.write(f"AI回复内容:\n{ai_content[:500]}...\n")
             
-            # 显示AI建议窗口
-            show_ai_suggestion_window(ai_content, today_work, tomorrow_plan)
+            # 显示AI建议窗口，传入重新生成回调
+            def regenerate():
+                # 重新调用ai_suggest函数
+                ai_suggest()
+            
+            show_ai_suggestion_window(ai_content, today_work, tomorrow_plan, regenerate_callback=regenerate)
         else:
             error_msg = f"API调用失败: HTTP {response.status_code}"
             try:
@@ -681,16 +917,25 @@ def fallback_suggestion(error_msg=""):
     # 关闭按钮
     ttk.Button(win, text="关闭", command=win.destroy).pack(pady=10)
 
-def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget):
-    """显示AI建议窗口，用户可以接受或拒绝"""
+def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget, regenerate_callback=None):
+    """显示AI建议窗口，用户可以接受、拒绝或重新生成
+    
+    Args:
+        ai_content: AI生成的内容
+        today_widget: 今日工作输入框
+        tomorrow_widget: 明日计划输入框
+        regenerate_callback: 重新生成回调函数
+    """
     win = tk.Toplevel(root)
     win.title("AI建议 - 工作汇报优化")
-    win.geometry("700x500")
+    win.geometry("750x550")
     win.transient(root)
     win.grab_set()
     
     # 说明标签
-    tk.Label(win, text="AI生成的优化建议：", font=("微软雅黑", 12, "bold")).pack(pady=10)
+    header_frame = tk.Frame(win)
+    header_frame.pack(fill="x", padx=20, pady=10)
+    tk.Label(header_frame, text="AI生成的优化建议：", font=("微软雅黑", 12, "bold")).pack(side=tk.LEFT)
     
     # 显示AI建议内容
     text_frame = tk.Frame(win)
@@ -708,7 +953,7 @@ def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget):
     
     # 按钮框架
     btn_frame = tk.Frame(win)
-    btn_frame.pack(pady=20)
+    btn_frame.pack(pady=15)
     
     def accept_suggestion():
         """接受AI建议，将内容填充到输入框"""
@@ -746,14 +991,32 @@ def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget):
         msg_window.grab_set()
         label = tk.Label(msg_window, text="AI建议已应用到输入框！", padx=20, pady=20)
         label.pack()
-        msg_window.after(3000, msg_window.destroy)
+        msg_window.after(2000, msg_window.destroy)
     
-    def reject_suggestion():
-        """拒绝AI建议"""
+    def cancel_suggestion():
+        """取消，关闭窗口"""
         win.destroy()
     
-    ttk.Button(btn_frame, text="接受建议", command=accept_suggestion).pack(side=tk.LEFT, padx=10)
-    ttk.Button(btn_frame, text="拒绝", command=reject_suggestion).pack(side=tk.LEFT, padx=10)
+    def regenerate_suggestion():
+        """重新生成建议"""
+        win.destroy()
+        if regenerate_callback:
+            regenerate_callback()
+    
+    # 按钮样式
+    btn_style = {"font": ("微软雅黑", 10), "padx": 15, "pady": 5}
+    
+    # 同意应用按钮 - 绿色
+    tk.Button(btn_frame, text="✓ 同意应用", command=accept_suggestion, 
+             bg="#4CAF50", fg="white", **btn_style).pack(side=tk.LEFT, padx=5)
+    
+    # 重新生成按钮 - 蓝色
+    tk.Button(btn_frame, text="↻ 重新生成", command=regenerate_suggestion,
+             bg="#2196F3", fg="white", **btn_style).pack(side=tk.LEFT, padx=5)
+    
+    # 取消按钮 - 灰色
+    tk.Button(btn_frame, text="✗ 取消", command=cancel_suggestion,
+             bg="#9E9E9E", fg="white", **btn_style).pack(side=tk.LEFT, padx=5)
 
 def send_to_wechat_wrapper():
     """发送到企微的包装函数，确保先有内容再发送"""
@@ -862,6 +1125,15 @@ def generate_report(autocopy=False):
 
 # 启动后自动加载输入内容
 root.after(200, load_all_inputs)
+
+# 检查是否首次使用（没有配置API Key）
+def check_first_time():
+    ai_config = load_ai_config()
+    if not ai_config.get("api_key"):
+        # 首次使用，弹出配置窗口
+        show_ai_config_dialog(first_time=True)
+
+root.after(500, check_first_time)
 
 
 def on_close_all():
