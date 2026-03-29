@@ -802,7 +802,16 @@ def ai_suggest():
         return date.weekday() >= 5  # 5=周六, 6=周日
     
     def get_tomorrow_date():
-        """获取明天的日期"""
+        """获取明天的日期（基于用户选择的日期）"""
+        try:
+            # 从date_var获取用户选择的日期
+            selected_date_str = date_var.get().strip()
+            if selected_date_str:
+                selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d")
+                return selected_date + timedelta(days=1)
+        except Exception:
+            pass
+        # 如果获取失败，使用系统当前日期
         return datetime.now() + timedelta(days=1)
     
     tomorrow_date = get_tomorrow_date()
