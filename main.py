@@ -119,24 +119,89 @@ https://github.com/chatanywhere/GPT_API_free
     # 模型选择 - 使用Combobox支持自定义输入
     tk.Label(form_frame, text="模型:", font=("微软雅黑", 10)).grid(row=2, column=0, sticky="w", pady=5)
     model_var = tk.StringVar(value=config.get("model", DEFAULT_AI_CONFIG["model"]))
-    # Combobox支持从列表选择，也支持手动输入
+    # 获取保存的模型列表或使用默认值
+    saved_models = config.get("available_models", DEFAULT_AI_CONFIG["available_models"])
     model_combo = ttk.Combobox(form_frame, textvariable=model_var, 
-                               values=DEFAULT_AI_CONFIG["available_models"], 
+                               values=saved_models, 
                                font=("微软雅黑", 10), width=48)
     model_combo.grid(row=2, column=1, pady=5)
     # 提示用户可以输入自定义模型
-    tk.Label(form_frame, text="(可手动输入其他模型)", font=("微软雅黑", 8), fg="gray").grid(row=3, column=1, sticky="w")
+    tk.Label(form_frame, text="(可手动输入或从API获取)", font=("微软雅黑", 8), fg="gray").grid(row=3, column=1, sticky="w")
+    
+    # 获取模型列表按钮
+    def fetch_models():
+        """从API获取可用模型列表"""
+        api_key = api_key_var.get().strip()
+        api_url = api_url_var.get().strip()
+        
+        if not api_key:
+            messagebox.showwarning("警告", "请先输入API Key！")
+            return
+        
+        # 显示获取窗口
+        fetch_win = tk.Toplevel(win)
+        fetch_win.title("获取模型列表")
+        fetch_win.geometry("300x100")
+        fetch_win.transient(win)
+        fetch_win.grab_set()
+        tk.Label(fetch_win, text="正在获取可用模型列表...", font=("微软雅黑", 11)).pack(pady=20)
+        fetch_win.update()
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # 尝试从API获取模型列表
+            # OpenAI兼容的API通常使用 /v1/models 端点
+            base_url = api_url.rsplit('/', 2)[0]  # 移除 /v1/chat/completions
+            models_url = f"{base_url}/v1/models"
+            
+            response = requests.get(
+                models_url,
+                headers=headers,
+                timeout=10
+            )
+            
+            fetch_win.destroy()
+            
+            if response.status_code == 200:
+                data = response.json()
+                models = [m.get("id", "") for m in data.get("data", [])]
+                # 过滤掉嵌入模型等不适合的模型
+                chat_models = [m for m in models if any(keyword in m.lower() for keyword in 
+                              ['gpt', 'claude', 'deepseek', 'qwen', 'glm', 'chat', 'llama', 'mistral'])]
+                
+                if chat_models:
+                    model_combo['values'] = chat_models
+                    messagebox.showinfo("成功", f"已获取 {len(chat_models)} 个可用模型！")
+                else:
+                    messagebox.showwarning("提示", "未找到合适的聊天模型，使用默认列表。")
+            else:
+                error_msg = response.json().get("error", {}).get("message", "未知错误")
+                messagebox.showerror("失败", f"获取模型列表失败：\n{error_msg}\n\n您可以手动输入模型名称。")
+        except Exception as e:
+            fetch_win.destroy()
+            messagebox.showerror("失败", f"获取模型列表失败：\n{str(e)}\n\n您可以手动输入模型名称。")
+    
+    tk.Button(form_frame, text="获取模型", command=fetch_models, font=("微软雅黑", 9), padx=5).grid(row=2, column=2, padx=5)
     
     # 按钮
     btn_frame = tk.Frame(win)
     btn_frame.pack(pady=20)
     
     def save_config():
+        # 保存当前模型列表（可能是从API获取的）
+        current_models = list(model_combo['values'])
+        if not current_models:  # 如果为空，使用默认值
+            current_models = DEFAULT_AI_CONFIG["available_models"]
+        
         new_config = {
             "api_key": api_key_var.get().strip(),
             "api_url": api_url_var.get().strip(),
             "model": model_var.get(),
-            "available_models": DEFAULT_AI_CONFIG["available_models"]
+            "available_models": current_models
         }
         
         if not new_config["api_key"]:
@@ -731,7 +796,78 @@ def ai_suggest():
                  font=("微软雅黑", 10), padx=20).pack(pady=10)
         return
     
+    # 检测明天是否为休息日
+    def is_weekend(date):
+        """判断是否为周末"""
+        return date.weekday() >= 5  # 5=周六, 6=周日
+    
+    def get_tomorrow_date():
+        """获取明天的日期"""
+        return datetime.now() + timedelta(days=1)
+    
+    tomorrow_date = get_tomorrow_date()
+    is_tomorrow_rest = is_weekend(tomorrow_date)
+    force_rest = False
+    
+    if is_tomorrow_rest:
+        # 明天是周末，询问用户是否休息
+        rest_win = tk.Toplevel(root)
+        rest_win.title("休息日检测")
+        rest_win.geometry("400x150")
+        rest_win.transient(root)
+        rest_win.grab_set()
+        
+        rest_text = f"明天是{tomorrow_date.strftime('%Y年%m月%d日')}（{'周六' if tomorrow_date.weekday() == 5 else '周日'}），是法定休息日。"
+        tk.Label(rest_win, text=rest_text, font=("微软雅黑", 11), wraplength=350).pack(pady=10)
+        tk.Label(rest_win, text="您明天是否休息？", font=("微软雅黑", 12, "bold")).pack(pady=5)
+        
+        rest_result = tk.BooleanVar(value=True)
+        
+        def set_rest():
+            rest_result.set(True)
+            rest_win.destroy()
+        
+        def set_work():
+            rest_result.set(False)
+            rest_win.destroy()
+        
+        btn_frame = tk.Frame(rest_win)
+        btn_frame.pack(pady=15)
+        tk.Button(btn_frame, text="是，明天休息", command=set_rest, bg="#4CAF50", fg="white", 
+                 font=("微软雅黑", 10), padx=20).pack(side=tk.LEFT, padx=10)
+        tk.Button(btn_frame, text="否，明天工作", command=set_work, bg="#2196F3", fg="white",
+                 font=("微软雅黑", 10), padx=20).pack(side=tk.LEFT, padx=10)
+        
+        root.wait_window(rest_win)
+        force_rest = rest_result.get()
+    
     # 构建提示词 - 明确说明汇报格式要求
+    # 根据是否休息调整明日计划部分的提示
+    if force_rest:
+        tomorrow_plan_prompt = """2、明日工作计划；
+a. 休息（无，无，无）
+
+【重要格式说明】
+- 今日工作：括号内格式为（实际完成进度，已完成内容，明天准备做的内容）
+  示例：完成XX模块开发（50%，已完成核心功能开发，明天进行接口联调）
+- 明日计划：明天是休息日，统一写"休息（无，无，无）"
+- 未完成的工作顺延到下一个工作日，不需要在明日计划中体现"""
+    else:
+        tomorrow_plan_prompt = """2、明日工作计划；
+a. 任务名称（预期进度，计划完成内容，后续安排）
+b. 任务名称（预期进度，计划完成内容，后续安排）
+c. ...
+
+【重要格式说明】
+- 今日工作：括号内格式为（实际完成进度，已完成内容，明天准备做的内容）
+  示例：完成XX模块开发（50%，已完成核心功能开发，明天进行接口联调）
+- 明日计划：括号内格式为（预期进度，计划完成内容，后续安排）
+  注意：明日计划是还未开始的工作，所以应该写"预期进度"而不是确定进度
+  示例：完成XX模块开发（预计50%，计划完成接口联调，进行测试验证）
+- 智能处理未完成工作：如果今日工作未100%完成，请自动将其剩余部分添加到明日计划中
+- 如果没有某项内容，填写"无"
+- 保持简洁，每条任务一行"""
+    
     prompt = f"""请优化以下工作汇报内容，使其更加专业、简洁、有条理。
 
 【当前填写的内容】
@@ -751,19 +887,7 @@ a. 任务名称（进度百分比，已完成的具体内容，明天准备做�
 b. 任务名称（进度百分比，已完成的具体内容，明天准备做的内容）
 c. ...
 
-2、明日工作计划；
-a. 任务名称（预期进度，计划完成内容，后续安排）
-b. 任务名称（预期进度，计划完成内容，后续安排）
-c. ...
-
-【重要格式说明】
-- 今日工作：括号内格式为（实际完成进度，已完成内容，明天准备做的内容）
-  示例：完成XX模块开发（50%，已完成核心功能开发，明天进行接口联调）
-- 明日计划：括号内格式为（预期进度，计划完成内容，后续安排）
-  注意：明日计划是还未开始的工作，所以应该写"预期进度"而不是确定进度
-  示例：完成XX模块开发（预计50%，计划完成接口联调，进行测试验证）
-- 如果没有某项内容，填写"无"
-- 保持简洁，每条任务一行
+{tomorrow_plan_prompt}
 
 【优化要求】
 - 使用简洁的短句，条理清晰
