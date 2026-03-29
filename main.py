@@ -151,21 +151,29 @@ def show_ai_config_dialog(first_time=False):
         fetch_win.update()
         
         try:
+            # 对于GET请求，只需要Authorization头部
             headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
+                "Authorization": f"Bearer {api_key}"
             }
             
             # 尝试从API获取模型列表
-            # OpenAI兼容的API通常使用 /v1/models 端点
-            base_url = api_url.rsplit('/', 2)[0]  # 移除 /v1/chat/completions
-            models_url = f"{base_url}/v1/models"
+            # 根据ChatAnywhere API文档，使用固定的模型列表端点
+            models_url = "https://api.chatanywhere.tech/v1/models"
+            
+            # 记录请求信息
+            with open(debug_file, "a", encoding="utf-8") as f:
+                f.write(f"请求模型列表URL: {models_url}\n")
             
             response = requests.get(
                 models_url,
                 headers=headers,
                 timeout=10
             )
+            
+            # 记录响应信息
+            with open(debug_file, "a", encoding="utf-8") as f:
+                f.write(f"模型列表响应状态码: {response.status_code}\n")
+                f.write(f"模型列表响应内容: {response.text[:300]}\n")
             
             fetch_win.destroy()
             
@@ -194,11 +202,22 @@ def show_ai_config_dialog(first_time=False):
                 try:
                     error_data = response.json()
                     if isinstance(error_data, dict):
-                        error_msg = error_data.get("error", {}).get("message", "未知错误")
+                        if "error" in error_data:
+                            error_info = error_data["error"]
+                            if isinstance(error_info, dict):
+                                error_msg = error_info.get("message", "未知错误")
+                            else:
+                                error_msg = str(error_info)
+                        else:
+                            error_msg = str(error_data)
                     else:
                         error_msg = str(error_data)
                 except Exception as e:
-                    error_msg = f"解析错误：{str(e)}"
+                    # 直接使用响应文本作为错误信息
+                    try:
+                        error_msg = response.text[:200]  # 限制长度
+                    except:
+                        error_msg = f"解析错误：{str(e)}"
                 messagebox.showerror("失败", f"获取模型列表失败：\n{error_msg}\n\n您可以手动输入模型名称。")
         except Exception as e:
             fetch_win.destroy()
@@ -1220,6 +1239,7 @@ ttk.Button(main_buttons, text="生成汇报", command=lambda: generate_report(Tr
 ttk.Button(main_buttons, text="清空重写", command=clear_inputs).pack(side=tk.LEFT, padx=5)
 ttk.Button(main_buttons, text="查历史", command=show_history_list).pack(side=tk.LEFT, padx=5)
 ttk.Button(main_buttons, text="AI建议", command=ai_suggest).pack(side=tk.LEFT, padx=5)
+ttk.Button(main_buttons, text="API配置", command=lambda: show_ai_config_dialog(first_time=False)).pack(side=tk.LEFT, padx=5)
 ttk.Button(main_buttons, text="模板定制", command=open_template_editor).pack(side=tk.LEFT, padx=5)
 
 def generate_report(autocopy=False):
