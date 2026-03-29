@@ -4,7 +4,8 @@ import os, json, re
 from datetime import datetime, timedelta
 from version import get_version_info
 from task_tracker import generate_today_work, parse_task_input, add_task
-from wechat_integration import open_wechat, send_to_wechat
+from wechat_integration import send_to_wechat
+import requests
 
 ROOT_DIR = "工作汇报记录"
 CFG_FILE = os.path.join(ROOT_DIR, "report_config.json")
@@ -494,26 +495,192 @@ def open_template_editor():
             msg_window.after(5000, msg_window.destroy)
     ttk.Button(win, text="保存并关闭", command=_save).pack(pady=5)
 
-def smart_suggest():
+def ai_suggest():
+    """使用DeepSeek API进行AI建议"""
+    # 获取当前填写的内容
+    today_work = input_widgets.get("today_work", None)
+    tomorrow_plan = input_widgets.get("tomorrow_plan", None)
+    
+    today_content = today_work.get("1.0", tk.END).strip() if today_work else ""
+    tomorrow_content = tomorrow_plan.get("1.0", tk.END).strip() if tomorrow_plan else ""
+    
+    if not today_content and not tomorrow_content:
+        msg_window = tk.Toplevel(root)
+        msg_window.title("提示")
+        msg_window.geometry("300x100")
+        msg_window.transient(root)
+        msg_window.grab_set()
+        label = tk.Label(msg_window, text="请先填写工作内容！", padx=20, pady=20)
+        label.pack()
+        msg_window.after(3000, msg_window.destroy)
+        return
+    
+    # 构建提示词
+    prompt = f"""请优化以下工作汇报内容，使其更加专业、简洁、有条理。
+
+今日工作完成情况：
+{today_content if today_content else '无'}
+
+明日工作计划：
+{tomorrow_content if tomorrow_content else '无'}
+
+请按照以下格式输出优化后的内容：
+1、今日工作完成情况；
+[优化后的内容，每条用a. b. c.等编号]
+
+2、明日工作计划；
+[优化后的内容，每条用a. b. c.等编号]
+
+要求：
+- 使用简洁的短句，条理清晰
+- 适当量化工作成效，例如"完成XX模块开发50%"
+- 明日计划明确到具体任务或目标
+- 保持原有的任务格式：任务名称（进度，完成内容，准备做的内容）"""
+    
+    # 创建等待窗口
+    wait_window = tk.Toplevel(root)
+    wait_window.title("AI建议")
+    wait_window.geometry("300x100")
+    wait_window.transient(root)
+    wait_window.grab_set()
+    wait_label = tk.Label(wait_window, text="正在生成AI建议，请稍候...", padx=20, pady=20)
+    wait_label.pack()
+    root.update()
+    
+    try:
+        # 调用DeepSeek API
+        api_key = "sk-2RcxkkQVN5C9XfTi2umncD2r5VXqL7ngjDTBSrm77JGJhwIy"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
+        
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+        
+        wait_window.destroy()
+        
+        if response.status_code == 200:
+            result = response.json()
+            ai_content = result["choices"][0]["message"]["content"]
+            
+            # 显示AI建议窗口
+            show_ai_suggestion_window(ai_content, today_work, tomorrow_plan)
+        else:
+            # API调用失败，使用本地建议
+            fallback_suggestion()
+            
+    except Exception as e:
+        wait_window.destroy()
+        # API调用失败，使用本地建议
+        fallback_suggestion()
+
+def fallback_suggestion():
+    """API失败时的本地建议"""
     content = []
     for k in ["today_work","tomorrow_plan"]:
         v = input_widgets[k].get("1.0", tk.END)
         content.append(v)
     fulltext = "\n".join(content)
     advice = make_suggestion(fulltext)
-    # 创建自动关闭的消息框
+    
     msg_window = tk.Toplevel(root)
-    msg_window.title("智能建议")
+    msg_window.title("AI建议（本地模式）")
     msg_window.geometry("400x200")
     msg_window.transient(root)
     msg_window.grab_set()
     
-    # 消息内容
     label = tk.Label(msg_window, text=advice, padx=20, pady=20, justify=tk.LEFT)
     label.pack()
     
-    # 5秒后自动关闭
     msg_window.after(5000, msg_window.destroy)
+
+def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget):
+    """显示AI建议窗口，用户可以接受或拒绝"""
+    win = tk.Toplevel(root)
+    win.title("AI建议 - 工作汇报优化")
+    win.geometry("700x500")
+    win.transient(root)
+    win.grab_set()
+    
+    # 说明标签
+    tk.Label(win, text="AI生成的优化建议：", font=("微软雅黑", 12, "bold")).pack(pady=10)
+    
+    # 显示AI建议内容
+    text_frame = tk.Frame(win)
+    text_frame.pack(fill="both", expand=True, padx=20, pady=10)
+    
+    scrollbar = tk.Scrollbar(text_frame)
+    scrollbar.pack(side="right", fill="y")
+    
+    ai_text = tk.Text(text_frame, font=("Consolas", 11), wrap=tk.WORD, yscrollcommand=scrollbar.set)
+    ai_text.pack(side="left", fill="both", expand=True)
+    scrollbar.config(command=ai_text.yview)
+    
+    ai_text.insert("1.0", ai_content)
+    ai_text.config(state="disabled")
+    
+    # 按钮框架
+    btn_frame = tk.Frame(win)
+    btn_frame.pack(pady=20)
+    
+    def accept_suggestion():
+        """接受AI建议，将内容填充到输入框"""
+        # 解析AI生成的内容
+        content = ai_content
+        
+        # 尝试提取今日工作和明日计划
+        today_match = re.search(r'1[、.]今日工作完成情况[；:]?(.*?)(?=2[、.]明日工作计划|$)', content, re.DOTALL)
+        tomorrow_match = re.search(r'2[、.]明日工作计划[；:]?(.*)', content, re.DOTALL)
+        
+        if today_match and today_widget:
+            today_text = today_match.group(1).strip()
+            # 清理编号
+            today_text = re.sub(r'^[a-zA-Z][.．、]\s*', '', today_text, flags=re.MULTILINE)
+            today_widget.delete("1.0", tk.END)
+            today_widget.insert("1.0", today_text)
+        
+        if tomorrow_match and tomorrow_widget:
+            tomorrow_text = tomorrow_match.group(1).strip()
+            # 清理编号
+            tomorrow_text = re.sub(r'^[a-zA-Z][.．、]\s*', '', tomorrow_text, flags=re.MULTILINE)
+            tomorrow_widget.delete("1.0", tk.END)
+            tomorrow_widget.insert("1.0", tomorrow_text)
+        
+        # 保存输入
+        save_all_inputs()
+        
+        win.destroy()
+        
+        # 显示成功消息
+        msg_window = tk.Toplevel(root)
+        msg_window.title("成功")
+        msg_window.geometry("300x100")
+        msg_window.transient(root)
+        msg_window.grab_set()
+        label = tk.Label(msg_window, text="AI建议已应用到输入框！", padx=20, pady=20)
+        label.pack()
+        msg_window.after(3000, msg_window.destroy)
+    
+    def reject_suggestion():
+        """拒绝AI建议"""
+        win.destroy()
+    
+    ttk.Button(btn_frame, text="接受建议", command=accept_suggestion).pack(side=tk.LEFT, padx=10)
+    ttk.Button(btn_frame, text="拒绝", command=reject_suggestion).pack(side=tk.LEFT, padx=10)
 
 def send_to_wechat_wrapper():
     """发送到企微的包装函数，确保先有内容再发送"""
@@ -555,29 +722,17 @@ def send_to_wechat_wrapper():
             # 3秒后自动关闭
             msg_window.after(3000, msg_window.destroy)
 
-# 主按钮
+# 主按钮 - 所有按钮放在同一行
 main_buttons = tk.Frame(btnframe, bg="#f5f7fa")
-main_buttons.grid(row=0, column=0, columnspan=9, pady=5)
+main_buttons.pack(pady=5)
 
-# 核心功能按钮
-ttk.Button(main_buttons, text="生成汇报", command=lambda: generate_report(True), style="Primary.TButton").pack(side=tk.LEFT, padx=8)
-ttk.Button(main_buttons, text="复制内容", command=copy_now).pack(side=tk.LEFT, padx=8)
-ttk.Button(main_buttons, text="清空重写", command=clear_inputs).pack(side=tk.LEFT, padx=8)
-
-# 企业微信相关按钮
-wechat_buttons = tk.Frame(btnframe, bg="#f5f7fa")
-wechat_buttons.grid(row=1, column=0, columnspan=9, pady=5)
-
-ttk.Button(wechat_buttons, text="打开企微", command=open_wechat).pack(side=tk.LEFT, padx=8)
-ttk.Button(wechat_buttons, text="发送到企微", command=send_to_wechat_wrapper).pack(side=tk.LEFT, padx=8)
-
-# 其他功能按钮
-other_buttons = tk.Frame(btnframe, bg="#f5f7fa")
-other_buttons.grid(row=2, column=0, columnspan=9, pady=5)
-
-ttk.Button(other_buttons, text="查历史", command=show_history_list).pack(side=tk.LEFT, padx=8)
-ttk.Button(other_buttons, text="智能建议", command=smart_suggest).pack(side=tk.LEFT, padx=8)
-ttk.Button(other_buttons, text="模板定制", command=open_template_editor).pack(side=tk.LEFT, padx=8)
+# 核心功能按钮（同一行）
+ttk.Button(main_buttons, text="发送到企微", command=send_to_wechat_wrapper, style="Primary.TButton").pack(side=tk.LEFT, padx=5)
+ttk.Button(main_buttons, text="生成汇报", command=lambda: generate_report(True)).pack(side=tk.LEFT, padx=5)
+ttk.Button(main_buttons, text="清空重写", command=clear_inputs).pack(side=tk.LEFT, padx=5)
+ttk.Button(main_buttons, text="查历史", command=show_history_list).pack(side=tk.LEFT, padx=5)
+ttk.Button(main_buttons, text="AI建议", command=ai_suggest).pack(side=tk.LEFT, padx=5)
+ttk.Button(main_buttons, text="模板定制", command=open_template_editor).pack(side=tk.LEFT, padx=5)
 
 def generate_report(autocopy=False):
     user, dept, date = user_var.get().strip(), dept_var.get().strip(), date_var.get().strip()
