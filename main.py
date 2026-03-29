@@ -150,6 +150,9 @@ def show_ai_config_dialog(first_time=False):
         tk.Label(fetch_win, text="正在获取可用模型列表...", font=("微软雅黑", 11)).pack(pady=20)
         fetch_win.update()
         
+        # 定义调试文件路径
+        debug_file = os.path.join(ROOT_DIR, "ai_debug.log")
+        
         try:
             # 对于GET请求，只需要Authorization头部
             headers = {
@@ -162,6 +165,9 @@ def show_ai_config_dialog(first_time=False):
             
             # 记录请求信息
             with open(debug_file, "a", encoding="utf-8") as f:
+                f.write(f"\n{'='*50}\n")
+                f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"开始获取模型列表...\n")
                 f.write(f"请求模型列表URL: {models_url}\n")
             
             response = requests.get(
