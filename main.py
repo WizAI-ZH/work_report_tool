@@ -164,6 +164,9 @@ def show_ai_config_dialog(first_time=False):
             models_url = "https://api.chatanywhere.tech/v1/models"
             
             # 记录请求信息
+            print(f"请求模型列表URL: {models_url}")
+            print(f"请求头部: {headers}")
+            
             with open(debug_file, "a", encoding="utf-8") as f:
                 f.write(f"\n{'='*50}\n")
                 f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -177,6 +180,9 @@ def show_ai_config_dialog(first_time=False):
             )
             
             # 记录响应信息
+            print(f"模型列表响应状态码: {response.status_code}")
+            print(f"模型列表响应内容: {response.text[:300]}")
+            
             with open(debug_file, "a", encoding="utf-8") as f:
                 f.write(f"模型列表响应状态码: {response.status_code}\n")
                 f.write(f"模型列表响应内容: {response.text[:300]}\n")
@@ -596,7 +602,7 @@ def bind_autosave(widget):
     # 添加快捷键支持
     widget.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
     widget.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
-    widget.bind("<Control-c>", lambda e: copy_now())  # Ctrl+C 复制内容
+    widget.bind("<Control-c>", lambda e: (copy_now(), "break"))  # Ctrl+C 复制内容，阻止默认行为
     widget.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
     widget.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
     widget.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
@@ -800,6 +806,7 @@ def open_template_editor():
 
 def ai_suggest():
     """使用DeepSeek API进行AI建议"""
+    print("=== 开始AI建议功能 ===")
     # 获取当前填写的内容
     today_work = input_widgets.get("today_work", None)
     tomorrow_plan = input_widgets.get("tomorrow_plan", None)
@@ -807,7 +814,11 @@ def ai_suggest():
     today_content = today_work.get("1.0", tk.END).strip() if today_work else ""
     tomorrow_content = tomorrow_plan.get("1.0", tk.END).strip() if tomorrow_plan else ""
     
+    print(f"今日工作内容: {today_content[:100]}..." if len(today_content) > 100 else f"今日工作内容: {today_content}")
+    print(f"明日计划内容: {tomorrow_content}")
+    
     if not today_content and not tomorrow_content:
+        print("用户未填写工作内容")
         msg_window = tk.Toplevel(root)
         msg_window.title("提示")
         msg_window.geometry("300x100")
@@ -820,9 +831,11 @@ def ai_suggest():
     
     # 加载AI配置
     ai_config = load_ai_config()
+    print(f"AI配置: {ai_config}")
     
     # 检查是否配置了API Key
     if not ai_config.get("api_key"):
+        print("未配置API Key")
         msg_window = tk.Toplevel(root)
         msg_window.title("提示")
         msg_window.geometry("400x150")
@@ -853,17 +866,26 @@ def ai_suggest():
             if selected_date_str:
                 selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d")
                 return selected_date + timedelta(days=1)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"获取日期失败: {str(e)}")
         # 如果获取失败，使用系统当前日期
         return datetime.now() + timedelta(days=1)
+    
+    # 检查用户是否在明日计划中明确写了"休息"
+    user_wants_rest = '休息' in tomorrow_content
+    print(f"用户是否明确写了'休息': {user_wants_rest}")
     
     tomorrow_date = get_tomorrow_date()
     is_tomorrow_rest = is_weekend(tomorrow_date)
     force_rest = False
     
-    if is_tomorrow_rest:
+    if user_wants_rest:
+        # 用户明确写了休息，直接按照休息处理
+        print("用户明确写了'休息'，直接按照休息处理")
+        force_rest = True
+    elif is_tomorrow_rest:
         # 明天是周末，询问用户是否休息
+        print(f"明天是{tomorrow_date.strftime('%Y年%m月%d日')}，是周末，询问用户是否休息")
         rest_win = tk.Toplevel(root)
         rest_win.title("休息日检测")
         rest_win.geometry("400x150")
@@ -893,12 +915,14 @@ def ai_suggest():
         
         root.wait_window(rest_win)
         force_rest = rest_result.get()
+        print(f"用户选择: {'休息' if force_rest else '工作'}")
     
     # 构建提示词 - 明确说明汇报格式要求
     # 根据是否休息调整明日计划部分的提示
     if force_rest:
+        print("构建休息模式的提示词")
         tomorrow_plan_prompt = """2、明日工作计划；
-a. 休息
+休息
 
 【重要格式说明】
 - 今日工作：括号内格式为（实际完成进度，已完成内容，明天准备做的内容）
@@ -908,6 +932,7 @@ a. 休息
 - 明日计划：明天是休息日，统一写"休息"两个字，不需要括号和其他内容
 - 未完成的工作顺延到下一个工作日，不需要在明日计划中体现"""
     else:
+        print("构建工作模式的提示词")
         tomorrow_plan_prompt = """2、明日工作计划；
 a. 任务名称（预期进度，计划完成内容，后续安排）
 b. 任务名称（预期进度，计划完成内容，后续安排）
@@ -954,6 +979,8 @@ c. ...
 - 明日计划明确到具体任务或目标
 - 严格保持上述格式，不要添加额外说明"""
     
+    print(f"生成的提示词: {prompt[:300]}...")
+    
     # 创建带进度条的等待窗口
     wait_window = tk.Toplevel(root)
     wait_window.title("AI建议生成中")
@@ -983,11 +1010,15 @@ c. ...
             f.write(f"\n{'='*50}\n")
             f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"开始调用AI API...\n")
+            f.write(f"是否强制休息: {force_rest}\n")
         
         # 使用用户配置的API
         api_key = ai_config["api_key"]
         api_url = ai_config.get("api_url", DEFAULT_AI_CONFIG["api_url"])
         model = ai_config.get("model", DEFAULT_AI_CONFIG["model"])
+        
+        print(f"调用API: {api_url}")
+        print(f"使用模型: {model}")
         
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -996,7 +1027,7 @@ c. ...
         data = {
             "model": model,
             "messages": [
-                {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。你必须严格按照用户要求的格式输出，今日工作使用实际进度，明日计划使用预期进度。\n\n重要规则：\n1. 对于100%完成的工作，不需要写'明天无'，因为工作已经结束\n2. 只有在需要明天继续做的情况下才写具体的明天准备做的内容\n3. 进度计算规则：明日计划的预期进度应该是在今天进度的基础上继续推进，而不是倒退\n   例如：今天完成60%，明天应该计划完成剩余的40%，而不是又从40%开始\n4. 休息处理规则：如果用户在明日计划中写了'休息'，请在明日计划中只保留'休息'，不要生成任何其他工作计划\n5. 未完成工作处理：当用户明日计划为'休息'时，未完成的工作应该保留在今日工作中，等待用户下次工作日再继续，不要添加到明日计划中\n6. 空项处理：如果明日计划确实没有内容，不要写'无'，直接留空即可\n7. 智能识别：要智能识别用户的真实意图，不要机械地替换内容"},
+                {"role": "system", "content": "你是一个专业的工作汇报优化助手，擅长将工作内容转化为专业、简洁、有条理的汇报文本。你必须严格按照用户要求的格式输出，今日工作使用实际进度，明日计划使用预期进度。\n\n重要规则：\n1. 休息优先原则：如果用户在明日计划中写了'休息'，或者系统检测到明天是休息日，你必须严格按照以下要求处理：\n   a. 明日计划中只能保留'休息'两个字，绝对不能生成任何其他工作计划\n   b. 即使有未完成的工作，也不要将其添加到明日计划中\n   c. 未完成的工作应该保留在今日工作中，等待用户下次工作日再继续\n2. 对于100%完成的工作，不需要写'明天无'，因为工作已经结束\n3. 只有在需要明天继续做的情况下才写具体的明天准备做的内容\n4. 进度计算规则：明日计划的预期进度应该是在今天进度的基础上继续推进，而不是倒退\n   例如：今天完成60%，明天应该计划完成剩余的40%，而不是又从40%开始\n5. 空项处理：如果明日计划确实没有内容，不要写'无'，直接留空即可\n6. 智能识别：要智能识别用户的真实意图，不要机械地替换内容\n\n示例：\n如果用户写：\n2、明日工作计划\n休息\n\n你应该生成：\n2、明日工作计划\n休息\n\n绝对不能生成：\n2、明日工作计划\n休息\n工作内容（...）"},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7,
@@ -1006,10 +1037,12 @@ c. ...
         with open(debug_file, "a", encoding="utf-8") as f:
             f.write(f"请求URL: {api_url}\n")
             f.write(f"请求模型: {model}\n")
+            f.write(f"请求数据: {str(data)[:500]}...\n")
         
         status_label.config(text="正在生成内容...")
         root.update()
         
+        print("开始发送API请求...")
         response = requests.post(
             api_url,
             headers=headers,
@@ -1017,14 +1050,19 @@ c. ...
             timeout=60
         )
         
+        print(f"API响应状态码: {response.status_code}")
+        
         with open(debug_file, "a", encoding="utf-8") as f:
             f.write(f"响应状态码: {response.status_code}\n")
+            f.write(f"响应内容: {response.text[:500]}...\n")
         
         wait_window.destroy()
         
         if response.status_code == 200:
             result = response.json()
             ai_content = result["choices"][0]["message"]["content"]
+            
+            print(f"AI生成内容: {ai_content[:300]}...")
             
             with open(debug_file, "a", encoding="utf-8") as f:
                 f.write(f"API调用成功！\n")
@@ -1044,6 +1082,8 @@ c. ...
             except:
                 error_msg += f", 响应内容: {response.text[:200]}"
             
+            print(f"API调用失败: {error_msg}")
+            
             with open(debug_file, "a", encoding="utf-8") as f:
                 f.write(f"{error_msg}\n")
             
@@ -1053,6 +1093,7 @@ c. ...
     except Exception as e:
         wait_window.destroy()
         error_msg = f"API调用异常: {str(e)}"
+        print(f"API调用异常: {str(e)}")
         
         with open(debug_file, "a", encoding="utf-8") as f:
             f.write(f"{error_msg}\n")
