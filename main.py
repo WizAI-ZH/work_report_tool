@@ -676,6 +676,8 @@ for w in input_widgets.values():
     w.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
     w.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
     w.bind("<Control-p>", lambda e: generate_report(False))  # Ctrl+P 预览汇报
+    # 禁用Ctrl+C快捷键
+    w.bind("<Control-c>", lambda e: "break")  # 禁用Ctrl+C
 
 # ===== 输出展示区 =====
 outLf = tk.LabelFrame(root, text="生成的汇报内容", font=("微软雅黑", 12, "bold"), bg="#f8fcff")
