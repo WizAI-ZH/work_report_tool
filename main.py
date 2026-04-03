@@ -643,12 +643,17 @@ def task_tab_input(event):
             # 任务名称输入完成，添加左括号
             widget.insert(tk.INSERT, "（")
         elif "）" not in current_line:
-            # 正在输入任务详情，只在需要时添加右括号
+            # 正在输入任务详情
             parts = current_line.split("，")
-            if len(parts) >= 3:
-                # 已经输入了三个部分，添加右括号
-                if "）" not in current_line:
-                    widget.insert(tk.INSERT, "）")
+            if len(parts) == 1:
+                # 进度输入完成，添加逗号
+                widget.insert(tk.INSERT, "，")
+            elif len(parts) == 2:
+                # 完成内容输入完成，添加逗号
+                widget.insert(tk.INSERT, "，")
+            elif len(parts) == 3:
+                # 准备做的内容输入完成，添加右括号
+                widget.insert(tk.INSERT, "）")
     
     # 阻止默认Tab行为
     return "break"
@@ -662,6 +667,12 @@ for w in input_widgets.values():
     w.bind("<Control-Return>", parse_and_add_task)
     # 绑定Tab键任务输入功能
     w.bind("<Tab>", task_tab_input)
+    
+    # 禁用可能干扰输入法的默认快捷键
+    w.bind("<Shift-4>", lambda e: "break")  # 禁用Shift+4
+    w.bind("<Shift-5>", lambda e: "break")  # 禁用Shift+5
+    w.bind("<Shift-7>", lambda e: "break")  # 禁用Shift+7
+    w.bind("<Shift-3>", lambda e: "break")  # 禁用Shift+3
 
 # ===== 输出展示区 =====
 outLf = tk.LabelFrame(root, text="生成的汇报内容", font=("微软雅黑", 12, "bold"), bg="#f8fcff")
