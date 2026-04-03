@@ -662,17 +662,20 @@ user_var.trace_add("write", lambda *a: save_all_inputs())
 dept_var.trace_add("write", lambda *a: save_all_inputs())
 date_var.trace_add("write", lambda *a: save_all_inputs())
 for w in input_widgets.values():
-    bind_autosave(w)
     # 绑定任务解析功能
     w.bind("<Control-Return>", parse_and_add_task)
-    # 绑定Tab键任务输入功能
+    # 绑定Tab键任务输入功能 - 使用更简单的实现
     w.bind("<Tab>", task_tab_input)
     
-    # 禁用可能干扰输入法的默认快捷键
-    w.bind("<Shift-4>", lambda e: "break")  # 禁用Shift+4
-    w.bind("<Shift-5>", lambda e: "break")  # 禁用Shift+5
-    w.bind("<Shift-7>", lambda e: "break")  # 禁用Shift+7
-    w.bind("<Shift-3>", lambda e: "break")  # 禁用Shift+3
+    # 只在焦点离开时保存，避免干扰输入法
+    w.bind("<FocusOut>", lambda e: save_all_inputs())
+    # 添加快捷键支持
+    w.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
+    w.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
+    w.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
+    w.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
+    w.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
+    w.bind("<Control-p>", lambda e: generate_report(False))  # Ctrl+P 预览汇报
 
 # ===== 输出展示区 =====
 outLf = tk.LabelFrame(root, text="生成的汇报内容", font=("微软雅黑", 12, "bold"), bg="#f8fcff")
