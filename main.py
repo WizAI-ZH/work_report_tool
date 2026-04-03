@@ -597,7 +597,7 @@ for item in template:
 
 # 持久化触发
 def bind_autosave(widget):
-    widget.bind("<KeyRelease>", lambda e: save_all_inputs())
+    # 只在焦点离开时保存，避免干扰输入法
     widget.bind("<FocusOut>", lambda e: save_all_inputs())
     # 添加快捷键支持
     widget.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
