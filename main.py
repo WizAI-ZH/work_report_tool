@@ -602,7 +602,6 @@ def bind_autosave(widget):
     # 添加快捷键支持
     widget.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
     widget.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
-    widget.bind("<Control-c>", lambda e: (copy_now(), "break"))  # Ctrl+C 复制内容，阻止默认行为
     widget.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
     widget.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
     widget.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
