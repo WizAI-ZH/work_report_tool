@@ -644,15 +644,33 @@ def task_tab_input(event):
             widget.insert(tk.INSERT, "（")
         elif "）" not in current_line:
             # 正在输入任务详情
+            # 计算当前光标所在的部分
+            cursor_pos_in_line = cursor_pos.split('.')[1]
             parts = current_line.split("，")
-            if len(parts) == 1:
-                # 进度输入完成，添加逗号
+            
+            # 计算光标所在的部分索引
+            part_index = 0
+            current_pos = 0
+            for i, part in enumerate(parts):
+                current_pos += len(part) + 1  # +1 for the comma
+                if int(cursor_pos_in_line) <= current_pos:
+                    part_index = i
+                    break
+            
+            if part_index == 0:
+                # 进度部分，允许输入百分比号
+                # 检查是否已经输入了百分比号
+                if "%" not in parts[0]:
+                    # 不自动添加逗号，让用户完成进度输入
+                    pass
+                else:
+                    # 已输入百分比号，添加逗号
+                    widget.insert(tk.INSERT, "，")
+            elif part_index == 1:
+                # 完成内容部分，添加逗号
                 widget.insert(tk.INSERT, "，")
-            elif len(parts) == 2:
-                # 完成内容输入完成，添加逗号
-                widget.insert(tk.INSERT, "，")
-            elif len(parts) == 3:
-                # 准备做的内容输入完成，添加右括号
+            elif part_index == 2:
+                # 准备做的内容部分，添加右括号
                 widget.insert(tk.INSERT, "）")
     
     # 阻止默认Tab行为
