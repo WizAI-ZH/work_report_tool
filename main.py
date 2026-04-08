@@ -1254,12 +1254,9 @@ def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget, regener
 
 def send_to_wechat_wrapper():
     """发送到企微的包装函数，确保先有内容再发送"""
-    # 先检查是否有内容
+    # 总是生成最新的汇报内容
+    generate_report(False)
     content = output_text.get("1.0", tk.END).strip()
-    if not content:
-        # 如果没有内容，先生成汇报
-        generate_report(False)
-        content = output_text.get("1.0", tk.END).strip()
     
     if content:
         success = send_to_wechat(content)
