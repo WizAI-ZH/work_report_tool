@@ -1338,19 +1338,7 @@ def generate_report(autocopy=False):
     if autocopy:
         root.clipboard_clear()
         root.clipboard_append(report_full)
-        # 创建自动关闭的消息框
-        msg_window = tk.Toplevel(root)
-        msg_window.title("已复制")
-        msg_window.geometry("300x100")
-        msg_window.transient(root)
-        msg_window.grab_set()
-        
-        # 消息内容
-        label = tk.Label(msg_window, text="汇报内容已生成并复制到剪贴板！", padx=20, pady=20)
-        label.pack()
-        
-        # 3秒后自动关闭
-        msg_window.after(3000, msg_window.destroy)
+        # 不显示消息框，直接复制
     save_all_inputs()
 
 
