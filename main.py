@@ -665,7 +665,7 @@ for w in input_widgets.values():
     # 绑定任务解析功能
     # w.bind("<Control-Return>", parse_and_add_task)
     # 绑定Tab键任务输入功能 - 使用更简单的实现
-    # w.bind("<Tab>", task_tab_input)
+    w.bind("<Tab>", task_tab_input)
     
     # 只在焦点离开时保存，避免干扰输入法
     w.bind("<FocusOut>", lambda e: save_all_inputs())
