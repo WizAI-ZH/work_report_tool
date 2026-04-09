@@ -599,13 +599,13 @@ for item in template:
 def bind_autosave(widget):
     # 只在焦点离开时保存，避免干扰输入法
     widget.bind("<FocusOut>", lambda e: save_all_inputs())
-    # 添加快捷键支持
-    widget.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
-    widget.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
-    widget.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
-    widget.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
-    widget.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
-    widget.bind("<Control-p>", lambda e: generate_report(False))  # Ctrl+P 预览汇报
+    # 添加快捷键支持 - 只保留最基本的功能
+    # widget.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
+    # widget.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
+    # widget.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
+    # widget.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
+    # widget.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
+    # widget.bind("<Control-p>", lambda e: generate_report(False))  # Ctrl+P 预览汇报
 
 # 任务解析功能
 def parse_and_add_task(event):
@@ -663,19 +663,19 @@ dept_var.trace_add("write", lambda *a: save_all_inputs())
 date_var.trace_add("write", lambda *a: save_all_inputs())
 for w in input_widgets.values():
     # 绑定任务解析功能
-    w.bind("<Control-Return>", parse_and_add_task)
+    # w.bind("<Control-Return>", parse_and_add_task)
     # 绑定Tab键任务输入功能 - 使用更简单的实现
-    w.bind("<Tab>", task_tab_input)
+    # w.bind("<Tab>", task_tab_input)
     
     # 只在焦点离开时保存，避免干扰输入法
     w.bind("<FocusOut>", lambda e: save_all_inputs())
-    # 添加快捷键支持
-    w.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
-    w.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
-    w.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
-    w.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
-    w.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
-    w.bind("<Control-p>", lambda e: generate_report(False))  # Ctrl+P 预览汇报
+    # 添加快捷键支持 - 只保留最基本的功能
+    # w.bind("<Control-Enter>", lambda e: generate_report(True))  # Ctrl+Enter 生成汇报
+    # w.bind("<Control-s>", lambda e: save_all_inputs())  # Ctrl+S 保存
+    # w.bind("<Control-n>", lambda e: clear_inputs())  # Ctrl+N 清空内容
+    # w.bind("<Control-o>", lambda e: show_history_list())  # Ctrl+O 打开历史
+    # w.bind("<Control-d>", lambda e: clear_inputs())  # Ctrl+D 清空内容
+    # w.bind("<Control-p>", lambda e: generate_report(False))  # Ctrl+P 预览汇报
 
 
 # ===== 输出展示区 =====
