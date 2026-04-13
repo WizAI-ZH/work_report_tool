@@ -21,7 +21,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='WorkReportGenerator_1.0.48.0',
+    name='WorkReportGenerator_1.0.50.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

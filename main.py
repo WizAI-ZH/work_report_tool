@@ -955,7 +955,7 @@ c. ...
 - 明日计划：括号内格式为（预期进度，计划完成内容，后续安排）
   注意：明日计划是还未开始的工作，所以应该写"预期进度"而不是确定进度
   示例：完成XX模块开发（预计50%，计划完成接口联调，进行测试验证）
-- 智能处理未完成工作：如果今日工作未100%完成，请自动将其剩余部分添加到明日计划中
+- 智能处理未完成工作：如果今日工作未100%完成，请自动将其剩余部分添加到明日计划中，除非用户在明天写明休息
 - 进度计算规则：明日计划的预期进度应该是在今天进度的基础上继续推进，而不是倒退
   例如：今天完成60%，明天应该计划完成剩余的40%，而不是又从40%开始
 - 如果没有某项内容，填写"无"
@@ -1067,7 +1067,7 @@ c. ...
         
         wait_window.destroy()
         
-        if response.status_code == 200:
+        if response.status_code == 200: # 成功响应
             result = response.json()
             ai_content = result["choices"][0]["message"]["content"]
             
@@ -1193,23 +1193,35 @@ def show_ai_suggestion_window(ai_content, today_widget, tomorrow_widget, regener
         # 解析AI生成的内容
         content = ai_content
         
+        print("=== 开始处理AI建议 ===")
+        print(f"AI生成的原始内容: {content[:200]}..." if len(content) > 200 else f"AI生成的原始内容: {content}")
+        
         # 尝试提取今日工作和明日计划
         today_match = re.search(r'1[、.]今日工作完成情况[；:]?(.*?)(?=2[、.]明日工作计划|$)', content, re.DOTALL)
         tomorrow_match = re.search(r'2[、.]明日工作计划[；:]?(.*)', content, re.DOTALL)
+        
+        print(f"今日工作匹配结果: {'成功' if today_match else '失败'}")
+        print(f"明日计划匹配结果: {'成功' if tomorrow_match else '失败'}")
         
         if today_match and today_widget:
             today_text = today_match.group(1).strip()
             # 清理编号
             today_text = re.sub(r'^[a-zA-Z][.．、]\s*', '', today_text, flags=re.MULTILINE)
             today_widget.delete("1.0", tk.END)
-            today_widget.insert("1.0", today_text)
+            today_widget.insert("1.0", today_text_clean)
+            print("今日工作已填充到输入框")
         
         if tomorrow_match and tomorrow_widget:
             tomorrow_text = tomorrow_match.group(1).strip()
             # 清理编号
-            tomorrow_text = re.sub(r'^[a-zA-Z][.．、]\s*', '', tomorrow_text, flags=re.MULTILINE)
+            tomorrow_text_clean = re.sub(r'^[a-zA-Z][.．、]\s*', '', tomorrow_text, flags=re.MULTILINE)
+            print(f"提取的明日计划(清理前): {tomorrow_text[:100]}..." if len(tomorrow_text) > 100 else f"提取的明日计划(清理前): {tomorrow_text}")
+            print(f"提取的明日计划(清理后): {tomorrow_text_clean[:100]}..." if len(tomorrow_text_clean) > 100 else f"提取的明日计划(清理后): {tomorrow_text_clean}")
             tomorrow_widget.delete("1.0", tk.END)
-            tomorrow_widget.insert("1.0", tomorrow_text)
+            tomorrow_widget.insert("1.0", tomorrow_text_clean)
+            print("明日计划已填充到输入框")
+        
+        print("=== AI建议处理完成 ===")
         
         # 保存输入
         save_all_inputs()
