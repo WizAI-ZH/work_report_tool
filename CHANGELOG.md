@@ -16,6 +16,7 @@
 - 新增应用内版本号显示。
 - 新增“威智工作汇报器”应用名称和 `wiz_work_repo_tool_logo.png` 应用图标。
 - 新增 Android APK、Windows MSIX/压缩包、macOS 构建脚本和 GitHub Actions 构建工作流。
+- Windows MSIX Release 附带 `.cer` 证书和一键证书安装脚本，便于自签名包首次安装。
 
 ### 修复
 
@@ -25,6 +26,7 @@
 - 修复历史任务去重和明日工作计划重复追加的问题。
 - 修复 Android 上 Flutter `_dependents.isEmpty` 断言崩溃。
 - 修复软件右上角图标按钮在移动端不易点击的问题。
+- 修复 Windows MSIX 使用未随包分发的测试证书导致安装时报 `0x800B010A` 的问题。
 
 ### 调整
 
