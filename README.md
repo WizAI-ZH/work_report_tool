@@ -1,48 +1,89 @@
 # 威智工作汇报器
 
-当前版本：1.0.0
+威智工作汇报器是一款用于快速生成每日工作汇报的跨平台应用，当前版本为 `1.0.0`。应用基于 Flutter 开发，目标支持 Windows、Android 和 macOS；仓库中仍保留旧版 Python/Tkinter 文件，作为功能迁移和对照参考。
 
-Flutter 跨端版本，目标支持 Windows、macOS 和 Android。旧版 Python/Tkinter 文件仍保留在仓库中，作为功能迁移参考。
+## 功能特性
+
+- 按姓名、部门、日期、今日完成情况、明日计划生成规范工作汇报。
+- 支持一键复制汇报内容，并在 Windows 上尝试打开企业微信；Android 和 macOS 上保留复制和手动粘贴流程。
+- 支持 AI 建议生成，可根据用户补充的不满意原因重新生成建议。
+- 支持 AI 配置，包括 API Key、API URL、模型、获取模型和测试连接。
+- 首次启动会引导配置 API Key，并提供免费 API Key 获取地址。
+- 自动保存历史记录、草稿、任务追踪数据和模板配置。
+- 内置中文日期选择和中文界面文案。
+- 应用内显示软件名称和版本号，当前应用名为“威智工作汇报器”。
+
+## 使用方法
+
+1. 打开应用后，首次使用先在弹窗中填写 API Key。
+2. 填写姓名、部门和汇报日期。
+3. 在“今日工作完成情况”和“明日工作计划”中输入工作内容。
+4. 点击“AI 建议”可让 AI 优化或补充内容。
+5. 点击“生成汇报”生成正式汇报文本。
+6. 点击“复制”或“发送到企微”完成发送前准备。
+7. 在顶部“历史”中查看历史汇报，在“模板”中调整汇报模板，在“AI”中修改 AI 配置。
 
 ## 本地开发
 
-先安装 Flutter SDK，并确认：
+请先安装 Flutter SDK，并确认开发环境可用：
 
-```bash
+```powershell
 flutter doctor
-```
-
-首次运行前生成当前平台工程并安装依赖：
-
-```bash
-flutter create --project-name work_report_generator --platforms=windows .
 flutter pub get
+flutter analyze
+flutter test
 ```
 
-运行桌面版：
+Windows 本地运行：
 
-```bash
+```powershell
 flutter run -d windows
+```
+
+Android 调试运行：
+
+```powershell
+flutter devices
+flutter run -d <device-id>
 ```
 
 ## 打包
 
-Windows PowerShell：
+单平台打包：
 
 ```powershell
 .\scripts\package.ps1 -Target windows
 .\scripts\package.ps1 -Target android
 ```
 
-macOS/Linux shell：
+双击发布到 GitHub Release：
 
-```bash
-bash scripts/package.sh macos
-bash scripts/package.sh android
+```text
+一键打包并发布.bat
 ```
 
-CI 可在 GitHub Actions 中手动触发 `Flutter Release` 工作流，分别产出 Android APK、Windows MSIX/Release 目录和 macOS DMG。
+该脚本会读取 `pubspec.yaml` 中的版本号，构建 Windows 和 Android 安装包，并把产物上传到对应的 GitHub Release。Release 描述来自 `CHANGELOG.md` 中同版本的更新内容。
 
-## 数据
+## 版本发布流程
 
-应用数据保存到系统应用文档目录下的 `工作汇报记录`。首次启动时，如果当前运行目录存在旧版 `工作汇报记录`，会在新数据目录为空时尝试导入。
+1. 在 `pubspec.yaml` 中更新 `version`，例如 `1.0.1+2`。
+2. 同步更新 `pubspec.yaml` 的 `msix_config.msix_version`，例如 `1.0.1.0`。
+3. 在 `CHANGELOG.md` 顶部新增对应版本的更新说明。
+4. 提交代码并推送到 GitHub。
+5. 双击 `一键打包并发布.bat`。
+
+## 数据存储
+
+应用数据保存到系统应用文档目录下的 `工作汇报记录`。首次启动时，如果当前运行目录存在旧版 `工作汇报记录`，会在新数据目录为空时尝试导入旧数据。
+
+## 构建产物
+
+发布脚本会把本地打包结果放在 `dist` 目录，例如：
+
+- `WizWorkReport_1.0.0_android.apk`
+- `WizWorkReport_1.0.0_windows.msix`
+- `WizWorkReport_1.0.0_windows.zip`
+
+## 许可
+
+本仓库为内部工作流工具项目，使用和分发请遵循仓库所属组织的要求。
