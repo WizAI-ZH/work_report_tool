@@ -188,7 +188,7 @@ try {
     (Join-Path $dist "WizWorkReport_${Version}_android.apk")
 
   flutter build windows --release
-  flutter pub run msix:create
+  flutter pub run msix:create --build-windows false
 
   $releaseDir = Join-Path $temp "build\windows\x64\runner\Release"
   $msix = Get-ChildItem -LiteralPath $releaseDir -Filter "*.msix" -File -ErrorAction SilentlyContinue |
