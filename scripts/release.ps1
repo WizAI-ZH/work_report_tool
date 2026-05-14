@@ -14,8 +14,10 @@ function Resolve-ToolPath {
   $androidTools = Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools"
   $jdkHome = "C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot"
   $jdkBin = Join-Path $jdkHome "bin"
+  $ghProgramFiles = Join-Path $env:ProgramFiles "GitHub CLI"
+  $ghLocalAppData = Join-Path $env:LOCALAPPDATA "Programs\GitHub CLI"
 
-  foreach ($path in @($flutterHome, $androidTools, $jdkBin)) {
+  foreach ($path in @($flutterHome, $androidTools, $jdkBin, $ghProgramFiles, $ghLocalAppData)) {
     if ((Test-Path $path) -and ($env:Path -notlike "*$path*")) {
       $env:Path = "$path;$env:Path"
     }
