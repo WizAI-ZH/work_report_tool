@@ -203,7 +203,7 @@ try {
 
   flutter build windows --release
   Assert-LastExitCode "flutter build windows"
-  flutter pub run msix:create --build-windows false
+  flutter pub run msix:create --build-windows false --install-certificate false
   Assert-LastExitCode "msix create"
 
   $releaseDir = Join-Path $temp "build\windows\x64\runner\Release"
