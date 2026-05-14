@@ -1,0 +1,84 @@
+name: Flutter Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create --project-name work_report_generator --platforms=android .
+      - name: Enable Android network permission
+        run: |
+          manifest="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q "android.permission.INTERNET" "$manifest"; then
+            perl -0pi -e 's/<manifest([^>]*)>/<manifest$1>\n    <uses-permission android:name="android.permission.INTERNET" \/>/' "$manifest"
+          fi
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WorkReportGenerator_android_apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  windows:
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create --project-name work_report_generator --platforms=windows .
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - run: flutter pub run msix:create
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WorkReportGenerator_windows
+          path: |
+            build/windows/x64/runner/Release/**
+            build/windows/x64/runner/Release/*.msix
+
+  macos:
+    runs-on: macos-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create --project-name work_report_generator --platforms=macos .
+      - name: Enable macOS network entitlement
+        run: |
+          for entitlement in macos/Runner/DebugProfile.entitlements macos/Runner/Release.entitlements; do
+            if ! grep -q "com.apple.security.network.client" "$entitlement"; then
+              perl -0pi -e 's#</dict>#    <key>com.apple.security.network.client</key>\n    <true/>\n</dict>#' "$entitlement"
+            fi
+          done
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Create dmg
+        run: |
+          mkdir -p dist
+          hdiutil create -volname WorkReportGenerator -srcfolder build/macos/Build/Products/Release/work_report_generator.app -ov -format UDZO dist/WorkReportGenerator_macos.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WorkReportGenerator_macos
+          path: dist/WorkReportGenerator_macos.dmg

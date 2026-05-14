@@ -1,5 +1,11 @@
 /工作汇报记录/
 /dist/
 /build/
+/logs/
+/releases/
 /.devcontainer/
 /.idea/
+/.dart_tool/
+/.flutter-plugins
+/.flutter-plugins-dependencies
+.packages
