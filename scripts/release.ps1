@@ -80,6 +80,89 @@ function Get-ReleaseTitle([string]$ReleaseVersion) {
   "$appName $ReleaseVersion"
 }
 
+function Ensure-MsixSigningCertificate([string]$RootPath) {
+  $certDir = Join-Path $RootPath "certs"
+  New-Item -ItemType Directory -Path $certDir -Force | Out-Null
+
+  $pfxPath = Join-Path $certDir "WizWorkReportTool-msix.pfx"
+  $cerPath = Join-Path $certDir "WizWorkReportTool-msix.cer"
+  $password = $env:WIZ_WORK_REPORT_CERT_PASSWORD
+  if (-not $password) {
+    $password = "WizWorkReportTool-Local-Signing"
+  }
+
+  if ((Test-Path $pfxPath) -and (Test-Path $cerPath)) {
+    return [PSCustomObject]@{
+      PfxPath = (Resolve-Path $pfxPath).Path
+      CerPath = (Resolve-Path $cerPath).Path
+      Password = $password
+    }
+  }
+
+  $subject = "CN=Wiz Work Report Tool"
+  $cert = New-SelfSignedCertificate `
+    -Type Custom `
+    -Subject $subject `
+    -FriendlyName "Wiz Work Report Tool MSIX Signing" `
+    -KeyAlgorithm RSA `
+    -KeyLength 2048 `
+    -KeyUsage DigitalSignature `
+    -CertStoreLocation "Cert:\CurrentUser\My" `
+    -NotAfter (Get-Date).AddYears(10) `
+    -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
+
+  $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
+  Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $securePassword | Out-Null
+  Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
+
+  [PSCustomObject]@{
+    PfxPath = (Resolve-Path $pfxPath).Path
+    CerPath = (Resolve-Path $cerPath).Path
+    Password = $password
+  }
+}
+
+function Write-CertificateInstallFiles(
+  [string]$DistPath,
+  [string]$ReleaseVersion,
+  [string]$CertificatePath
+) {
+  $cerName = "WizWorkReport_${ReleaseVersion}_windows.cer"
+  $cerOut = Join-Path $DistPath $cerName
+  Copy-Item -LiteralPath $CertificatePath -Destination $cerOut -Force
+
+  $ps1Name = "Install-WizWorkReport_${ReleaseVersion}_Certificate.ps1"
+  $ps1Path = Join-Path $DistPath $ps1Name
+  $ps1Content = @"
+`$ErrorActionPreference = "Stop"
+`$certPath = Join-Path `$PSScriptRoot "$cerName"
+if (-not (Test-Path `$certPath)) {
+  throw "Certificate file not found: `$certPath"
+}
+Import-Certificate -FilePath `$certPath -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+Write-Host "Certificate installed. You can now install the MSIX package."
+Read-Host "Press Enter to close"
+"@
+  $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+  [System.IO.File]::WriteAllText($ps1Path, $ps1Content, $utf8NoBom)
+
+  $batName = "Install-WizWorkReport_${ReleaseVersion}_Certificate.bat"
+  $batPath = Join-Path $DistPath $batName
+  $batContent = @"
+@echo off
+setlocal
+cd /d "%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File ""%~dp0$ps1Name""'"
+"@
+  [System.IO.File]::WriteAllText($batPath, $batContent, $utf8NoBom)
+
+  [PSCustomObject]@{
+    Certificate = (Get-Item -LiteralPath $cerOut).FullName
+    PowerShell = (Get-Item -LiteralPath $ps1Path).FullName
+    Batch = (Get-Item -LiteralPath $batPath).FullName
+  }
+}
+
 function Invoke-RobocopyMirror([string]$Source, [string]$Destination) {
   if (Test-Path $Destination) {
     Remove-Item -LiteralPath $Destination -Recurse -Force
@@ -187,6 +270,8 @@ Assert-CleanWorktree
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($notesFile, $releaseNotes, $utf8NoBom)
+$certInfo = Ensure-MsixSigningCertificate $projectRoot
+$certInstallFiles = Write-CertificateInstallFiles $dist $Version $certInfo.CerPath
 
 Invoke-RobocopyMirror $projectRoot $temp
 
@@ -209,7 +294,7 @@ try {
 
   flutter build windows --release
   Assert-LastExitCode "flutter build windows"
-  flutter pub run msix:create --build-windows false --install-certificate false
+  flutter pub run msix:create --build-windows false --install-certificate false --certificate-path $certInfo.PfxPath --certificate-password $certInfo.Password
   Assert-LastExitCode "msix create"
 
   $releaseDir = Join-Path $temp "build\windows\x64\runner\Release"
@@ -232,7 +317,14 @@ try {
   Pop-Location
 }
 
-$assets = @($androidApk.FullName, $windowsMsix.FullName, $windowsZip.FullName)
+$assets = @(
+  $androidApk.FullName,
+  $windowsMsix.FullName,
+  $windowsZip.FullName,
+  $certInstallFiles.Certificate,
+  $certInstallFiles.PowerShell,
+  $certInstallFiles.Batch
+)
 Ensure-GitHubRelease $tag $Version $notesFile $assets
 
 Write-Host ""
@@ -240,3 +332,5 @@ Write-Host "Release completed: $tag"
 Write-Host "Android APK: $($androidApk.FullName)"
 Write-Host "Windows MSIX: $($windowsMsix.FullName)"
 Write-Host "Windows ZIP: $($windowsZip.FullName)"
+Write-Host "Windows certificate: $($certInstallFiles.Certificate)"
+Write-Host "Windows certificate installer: $($certInstallFiles.Batch)"

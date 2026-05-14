@@ -3,6 +3,8 @@
 /build/
 /logs/
 /releases/
+/certs/*.pfx
+/certs/*.cer
 /.devcontainer/
 /.idea/
 /.dart_tool/
