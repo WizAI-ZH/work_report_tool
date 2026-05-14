@@ -135,16 +135,15 @@ function Ensure-GitHubRelease(
   git push $Remote $Tag
   Assert-LastExitCode "git push tag"
 
-  $releaseExists = $true
-  gh release view $Tag *> $null
-  if ($LASTEXITCODE -ne 0) {
-    $releaseExists = $false
-  }
+  cmd /c "gh release view $Tag >NUL 2>NUL"
+  $releaseExists = $LASTEXITCODE -eq 0
 
   $title = "Wiz Work Report Tool $ReleaseVersion"
   if ($releaseExists) {
     gh release edit $Tag --title $title --notes-file $NotesFile
+    Assert-LastExitCode "gh release edit"
     gh release upload $Tag $Assets --clobber
+    Assert-LastExitCode "gh release upload"
   } else {
     $args = @(
       "release", "create", $Tag,
@@ -155,6 +154,7 @@ function Ensure-GitHubRelease(
     if ($Prerelease) { $args += "--prerelease" }
     $args += $Assets
     gh @args
+    Assert-LastExitCode "gh release create"
   }
 }
 
