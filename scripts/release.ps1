@@ -174,7 +174,7 @@ $releaseNotes = Get-ChangelogSection $Version
 $projectRoot = (Resolve-Path ".").Path
 $dist = Join-Path $projectRoot "dist"
 $notesFile = Join-Path $dist "release-notes-$Version.md"
-$temp = Join-Path $env:SystemDrive "wrg_release_publish_$($Version.Replace('.', '_'))"
+$temp = Join-Path $env:SystemDrive "wrg_release_publish_$($Version.Replace('.', '_'))_$(Get-Date -Format 'yyyyMMddHHmmss')"
 
 Write-Host "Preparing release $tag"
 Assert-CleanWorktree
