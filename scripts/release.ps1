@@ -75,6 +75,11 @@ function Get-ChangelogSection([string]$ReleaseVersion) {
   $body
 }
 
+function Get-ReleaseTitle([string]$ReleaseVersion) {
+  $appName = -join ([char[]](0x5A01, 0x667A, 0x5DE5, 0x4F5C, 0x6C47, 0x62A5, 0x5668))
+  "$appName $ReleaseVersion"
+}
+
 function Invoke-RobocopyMirror([string]$Source, [string]$Destination) {
   if (Test-Path $Destination) {
     Remove-Item -LiteralPath $Destination -Recurse -Force
@@ -138,7 +143,7 @@ function Ensure-GitHubRelease(
   cmd /c "gh release view $Tag >NUL 2>NUL"
   $releaseExists = $LASTEXITCODE -eq 0
 
-  $title = "Wiz Work Report Tool $ReleaseVersion"
+  $title = Get-ReleaseTitle $ReleaseVersion
   if ($releaseExists) {
     gh release edit $Tag --title $title --notes-file $NotesFile
     Assert-LastExitCode "gh release edit"
@@ -180,7 +185,8 @@ Write-Host "Preparing release $tag"
 Assert-CleanWorktree
 
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
-Set-Content -LiteralPath $notesFile -Value $releaseNotes -Encoding UTF8
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($notesFile, $releaseNotes, $utf8NoBom)
 
 Invoke-RobocopyMirror $projectRoot $temp
 
