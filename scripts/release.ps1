@@ -40,6 +40,12 @@ function Require-Command([string]$Name, [string]$InstallHint) {
   }
 }
 
+function Assert-LastExitCode([string]$Step) {
+  if ($LASTEXITCODE -ne 0) {
+    throw "$Step failed with exit code $LASTEXITCODE."
+  }
+}
+
 function Get-PubspecVersion {
   $content = Get-Content -LiteralPath "pubspec.yaml" -Raw -Encoding UTF8
   if ($content -notmatch "(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)(?:\+([0-9]+))?\s*$") {
@@ -76,7 +82,7 @@ function Invoke-RobocopyMirror([string]$Source, [string]$Destination) {
   New-Item -ItemType Directory -Path $Destination | Out-Null
 
   robocopy $Source $Destination /MIR `
-    /XD .git .dart_tool build dist logs releases .idea `
+    /XD .git .dart_tool build dist logs releases .idea ephemeral .plugin_symlinks `
     /XF local.properties | Out-Null
 
   if ($LASTEXITCODE -ge 8) {
@@ -116,14 +122,18 @@ function Ensure-GitHubRelease(
   }
 
   git fetch $Remote --tags
+  Assert-LastExitCode "git fetch"
 
   $existingTag = git tag --list $Tag
   if (-not $existingTag) {
     git tag -a $Tag -m "Release $Tag"
+    Assert-LastExitCode "git tag"
   }
 
   git push $Remote HEAD
+  Assert-LastExitCode "git push HEAD"
   git push $Remote $Tag
+  Assert-LastExitCode "git push tag"
 
   $releaseExists = $true
   gh release view $Tag *> $null
@@ -177,18 +187,24 @@ Invoke-RobocopyMirror $projectRoot $temp
 Push-Location $temp
 try {
   flutter pub get
+  Assert-LastExitCode "flutter pub get"
   if (-not $SkipChecks) {
     flutter analyze
+    Assert-LastExitCode "flutter analyze"
     flutter test
+    Assert-LastExitCode "flutter test"
   }
 
   flutter build apk --release
+  Assert-LastExitCode "flutter build apk"
   $androidApk = Copy-ReleaseArtifact `
     (Join-Path $temp "build\app\outputs\flutter-apk\app-release.apk") `
     (Join-Path $dist "WizWorkReport_${Version}_android.apk")
 
   flutter build windows --release
+  Assert-LastExitCode "flutter build windows"
   flutter pub run msix:create --build-windows false
+  Assert-LastExitCode "msix create"
 
   $releaseDir = Join-Path $temp "build\windows\x64\runner\Release"
   $msix = Get-ChildItem -LiteralPath $releaseDir -Filter "*.msix" -File -ErrorAction SilentlyContinue |
