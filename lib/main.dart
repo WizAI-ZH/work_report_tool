@@ -10,11 +10,12 @@ import 'models/report_models.dart';
 import 'services/ai_service.dart';
 import 'services/report_service.dart';
 import 'services/storage_service.dart';
+import 'services/update_service.dart';
 import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.0.0';
+const _appVersion = '1.1.0';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +57,7 @@ class _HomePageState extends State<HomePage> {
   final _reports = ReportService();
   final _ai = AiService();
   final _wechat = WechatService();
+  final _updates = UpdateService();
 
   final _userController = TextEditingController();
   final _deptController = TextEditingController();
@@ -67,6 +69,7 @@ class _HomePageState extends State<HomePage> {
   var _aiConfig = AiConfig.defaults;
   var _historyTokens = <String>[];
   var _busy = true;
+  var _checkingUpdate = false;
   var _draftListenersAttached = false;
 
   @override
@@ -119,13 +122,17 @@ class _HomePageState extends State<HomePage> {
         _busy = false;
       });
       _attachDraftAutosave();
-      if (aiConfig.apiKey.trim().isEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _configureAi(firstTime: true);
-          }
-        });
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) {
+          return;
+        }
+        if (aiConfig.apiKey.trim().isEmpty) {
+          await _configureAi(firstTime: true);
+        }
+        if (mounted) {
+          await _checkForUpdates(silent: true);
+        }
+      });
     } catch (error) {
       for (final item in ReportService.defaultTemplate) {
         _fieldControllers.putIfAbsent(item.key, () => TextEditingController());
@@ -141,9 +148,12 @@ class _HomePageState extends State<HomePage> {
       });
       _attachDraftAutosave();
       _showSnack('本地数据初始化失败，已使用默认配置');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (mounted) {
-          _configureAi(firstTime: true);
+          await _configureAi(firstTime: true);
+          if (mounted) {
+            await _checkForUpdates(silent: true);
+          }
         }
       });
     }
@@ -566,6 +576,106 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _checkForUpdates({bool silent = false}) async {
+    if (_checkingUpdate) {
+      return;
+    }
+    setState(() => _checkingUpdate = true);
+    try {
+      final update = await _updates.fetchLatest(currentVersion: _appVersion);
+      if (!mounted) {
+        return;
+      }
+      if (update == null) {
+        if (!silent) {
+          _showSnack('当前已是最新版本');
+        }
+        return;
+      }
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('发现新版本 v${update.version}'),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('当前版本：v$_appVersion'),
+                const SizedBox(height: 8),
+                Text('安装包：${update.assetName}'),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      update.notes.trim().isEmpty
+                          ? '暂无更新说明。'
+                          : update.notes.trim(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Android 会下载 APK 并打开系统安装页，请按系统提示确认安装。'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('稍后'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.system_update_alt),
+              label: const Text('更新'),
+            ),
+          ],
+        ),
+      );
+      if (accepted == true && mounted) {
+        await _installUpdate(update);
+      }
+    } catch (error) {
+      if (mounted && !silent) {
+        _showSnack('$error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _checkingUpdate = false);
+      }
+    }
+  }
+
+  Future<void> _installUpdate(UpdateInfo update) async {
+    setState(() => _busy = true);
+    try {
+      final result = await _updates.downloadAndInstall(update);
+      if (!mounted) {
+        return;
+      }
+      switch (result) {
+        case 'install_started':
+          _showSnack('安装包已下载，请在系统安装页确认更新');
+        case 'unknown_sources':
+          _showSnack('已打开安装权限设置，允许后请回到应用重新点击更新');
+        case 'opened_release':
+          _showSnack('已打开 GitHub Release 下载页');
+        default:
+          _showSnack('无法自动打开安装包，请到 Release 页面手动下载');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showSnack('更新失败：$error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 900;
@@ -581,6 +691,18 @@ class _HomePageState extends State<HomePage> {
         ),
         foregroundColor: Theme.of(context).colorScheme.onSurface,
         actions: [
+          TextButton.icon(
+              onPressed: _checkingUpdate
+                  ? null
+                  : () => _checkForUpdates(silent: false),
+              icon: _checkingUpdate
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.system_update_alt),
+              label: const Text('更新')),
           TextButton.icon(
               onPressed: _configureAi,
               icon: const Icon(Icons.settings_suggest_outlined),

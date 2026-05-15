@@ -1,6 +1,6 @@
 # 威智工作汇报器
 
-威智工作汇报器是一款用于快速生成每日工作汇报的跨平台应用，当前版本为 `1.0.0`。应用基于 Flutter 开发，目标支持 Windows、Android 和 macOS；仓库中仍保留旧版 Python/Tkinter 文件，作为功能迁移和对照参考。
+威智工作汇报器是一款用于快速生成每日工作汇报的跨平台应用，当前版本为 `1.1.0`。应用基于 Flutter 开发，目标支持 Windows、Android 和 macOS；仓库中仍保留旧版 Python/Tkinter 文件，作为功能迁移和对照参考。
 
 ## 功能特性
 
@@ -10,6 +10,7 @@
 - 支持 AI 配置，包括 API Key、API URL、模型、获取模型和测试连接。
 - 首次启动会引导配置 API Key，并提供免费 API Key 获取地址。
 - 自动保存历史记录、草稿、任务追踪数据和模板配置。
+- 启动时自动检查 GitHub Release 新版本，Android 可下载 APK 并拉起系统安装页。
 - 内置中文日期选择和中文界面文案。
 - 应用内显示软件名称和版本号，当前应用名为“威智工作汇报器”。
 
@@ -78,6 +79,10 @@ Windows 的 `.msix` 安装包必须通过证书校验。当前项目使用本地
 
 正式对外分发时，建议改用受信任的代码签名证书或 Microsoft Trusted Signing，这样用户安装 MSIX 时就不需要手动信任自签名证书。
 
+## 自动更新说明
+
+应用启动时会自动检查 GitHub Release 最新版本，也可以点击右上角“更新”手动检查。Android 端发现新版本后会下载 APK 并打开系统安装确认页；受 Android 系统限制，普通应用不能静默安装更新，用户仍需手动确认安装。如果系统提示需要“安装未知应用”权限，请允许后回到应用重新点击更新。
+
 ## 版本发布流程
 
 1. 在 `pubspec.yaml` 中更新 `version`，例如 `1.0.1+2`。
@@ -94,12 +99,12 @@ Windows 的 `.msix` 安装包必须通过证书校验。当前项目使用本地
 
 发布脚本会把本地打包结果放在 `dist` 目录，例如：
 
-- `WizWorkReport_1.0.0_android.apk`
-- `WizWorkReport_1.0.0_windows_setup.exe`
-- `WizWorkReport_1.0.0_windows.msix`
-- `WizWorkReport_1.0.0_windows.zip`
-- `WizWorkReport_1.0.0_windows.cer`
-- `Install-WizWorkReport_1.0.0_Certificate.bat`
+- `WizWorkReport_1.1.0_android.apk`
+- `WizWorkReport_1.1.0_windows_setup.exe`
+- `WizWorkReport_1.1.0_windows.msix`
+- `WizWorkReport_1.1.0_windows.zip`
+- `WizWorkReport_1.1.0_windows.cer`
+- `Install-WizWorkReport_1.1.0_Certificate.bat`
 
 ## 许可
 

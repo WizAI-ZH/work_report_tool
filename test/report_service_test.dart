@@ -5,6 +5,7 @@ import 'package:work_report_generator/models/report_models.dart';
 import 'package:work_report_generator/services/ai_service.dart';
 import 'package:work_report_generator/services/report_service.dart';
 import 'package:work_report_generator/services/storage_service.dart';
+import 'package:work_report_generator/services/update_service.dart';
 
 void main() {
   group('ReportService', () {
@@ -209,6 +210,14 @@ void main() {
       );
 
       expect(suggestion, contains('建议'));
+    });
+  });
+
+  group('UpdateService', () {
+    test('compares semantic versions', () {
+      expect(UpdateService.compareVersions('1.1.0', '1.0.9'), greaterThan(0));
+      expect(UpdateService.compareVersions('1.1.0', '1.1.0'), 0);
+      expect(UpdateService.compareVersions('1.0.9', '1.1.0'), lessThan(0));
     });
   });
 }
