@@ -17,6 +17,7 @@
 - 新增“威智工作汇报器”应用名称和 `wiz_work_repo_tool_logo.png` 应用图标。
 - 新增 Android APK、Windows MSIX/压缩包、macOS 构建脚本和 GitHub Actions 构建工作流。
 - Windows MSIX Release 附带 `.cer` 证书和一键证书安装脚本，便于自签名包首次安装。
+- 新增 Windows NSIS `.exe` 安装包，作为普通用户推荐下载项。
 
 ### 修复
 
@@ -27,6 +28,7 @@
 - 修复 Android 上 Flutter `_dependents.isEmpty` 断言崩溃。
 - 修复软件右上角图标按钮在移动端不易点击的问题。
 - 修复 Windows MSIX 使用未随包分发的测试证书导致安装时报 `0x800B010A` 的问题。
+- Windows 安装分发增加无需预安装证书的 NSIS 安装包，降低 MSIX 自签名证书带来的安装门槛。
 
 ### 调整
 

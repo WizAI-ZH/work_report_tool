@@ -66,13 +66,15 @@ flutter run -d <device-id>
 
 ## Windows 安装说明
 
-Windows 的 `.msix` 安装包必须通过证书校验。当前项目使用本地自签名证书进行 MSIX 签名，因此首次安装前需要先信任同版本 Release 中附带的证书：
+普通 Windows 用户建议优先下载 `WizWorkReport_<版本号>_windows_setup.exe`。这是 NSIS 安装包，不需要先安装 MSIX 证书，双击后按提示安装即可。
+
+Windows 的 `.msix` 安装包必须通过证书校验。当前项目使用本地自签名证书进行 MSIX 签名，因此如果选择 MSIX，需要首次安装前先信任同版本 Release 中附带的证书：
 
 1. 在 GitHub Release 下载 `WizWorkReport_<版本号>_windows.cer`。
 2. 下载并运行 `Install-WizWorkReport_<版本号>_Certificate.bat`，按系统提示允许管理员权限。
 3. 再双击安装 `WizWorkReport_<版本号>_windows.msix`。
 
-如果不想安装证书，可以下载 `WizWorkReport_<版本号>_windows.zip`，解压后直接运行其中的 `work_report_generator.exe`。
+如果不想安装证书，也可以下载 `WizWorkReport_<版本号>_windows.zip`，解压后直接运行其中的 `work_report_generator.exe`。
 
 正式对外分发时，建议改用受信任的代码签名证书或 Microsoft Trusted Signing，这样用户安装 MSIX 时就不需要手动信任自签名证书。
 
@@ -93,6 +95,7 @@ Windows 的 `.msix` 安装包必须通过证书校验。当前项目使用本地
 发布脚本会把本地打包结果放在 `dist` 目录，例如：
 
 - `WizWorkReport_1.0.0_android.apk`
+- `WizWorkReport_1.0.0_windows_setup.exe`
 - `WizWorkReport_1.0.0_windows.msix`
 - `WizWorkReport_1.0.0_windows.zip`
 - `WizWorkReport_1.0.0_windows.cer`

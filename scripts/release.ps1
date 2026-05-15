@@ -16,8 +16,10 @@ function Resolve-ToolPath {
   $jdkBin = Join-Path $jdkHome "bin"
   $ghProgramFiles = Join-Path $env:ProgramFiles "GitHub CLI"
   $ghLocalAppData = Join-Path $env:LOCALAPPDATA "Programs\GitHub CLI"
+  $nsisProgramFiles = Join-Path ${env:ProgramFiles(x86)} "NSIS"
+  $nsisProgramFiles64 = Join-Path $env:ProgramFiles "NSIS"
 
-  foreach ($path in @($flutterHome, $androidTools, $jdkBin, $ghProgramFiles, $ghLocalAppData)) {
+  foreach ($path in @($flutterHome, $androidTools, $jdkBin, $ghProgramFiles, $ghLocalAppData, $nsisProgramFiles, $nsisProgramFiles64)) {
     if ((Test-Path $path) -and ($env:Path -notlike "*$path*")) {
       $env:Path = "$path;$env:Path"
     }
@@ -37,6 +39,23 @@ function Resolve-ToolPath {
 function Require-Command([string]$Name, [string]$InstallHint) {
   if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
     throw "Missing command: $Name. $InstallHint"
+  }
+}
+
+function Ensure-NSIS {
+  if (Get-Command "makensis" -ErrorAction SilentlyContinue) {
+    return
+  }
+
+  if (Get-Command "winget" -ErrorAction SilentlyContinue) {
+    Write-Host "NSIS was not found. Installing NSIS with winget..."
+    winget install --id NSIS.NSIS --source winget --accept-package-agreements --accept-source-agreements --silent
+    Assert-LastExitCode "winget install NSIS"
+    Resolve-ToolPath
+  }
+
+  if (-not (Get-Command "makensis" -ErrorAction SilentlyContinue)) {
+    throw "Missing command: makensis. Install NSIS from https://nsis.sourceforge.io/Download"
   }
 }
 
@@ -186,6 +205,41 @@ function Copy-ReleaseArtifact([string]$Source, [string]$Destination) {
   Get-Item -LiteralPath $Destination
 }
 
+function Build-NSISInstaller(
+  [string]$ScriptPath,
+  [string]$SourceDir,
+  [string]$IconPath,
+  [string]$ReleaseVersion,
+  [string]$OutputPath
+) {
+  Ensure-NSIS
+  if (-not (Test-Path $ScriptPath)) {
+    throw "NSIS script not found: $ScriptPath"
+  }
+  if (-not (Test-Path $SourceDir)) {
+    throw "NSIS source directory not found: $SourceDir"
+  }
+
+  $args = @(
+    "/V2",
+    "/DVERSION=$ReleaseVersion",
+    "/DSOURCE_DIR=$SourceDir",
+    "/DOUT_FILE=$OutputPath"
+  )
+  if (Test-Path $IconPath) {
+    $args += "/DICON_PATH=$IconPath"
+  }
+  $args += $ScriptPath
+
+  & makensis @args
+  Assert-LastExitCode "makensis"
+
+  if (-not (Test-Path $OutputPath)) {
+    throw "NSIS installer was not created: $OutputPath"
+  }
+  Get-Item -LiteralPath $OutputPath
+}
+
 function Assert-CleanWorktree {
   if ($AllowDirty) {
     return
@@ -313,12 +367,21 @@ try {
   }
   Compress-Archive -Path (Join-Path $releaseDir "*") -DestinationPath $windowsZipPath -Force
   $windowsZip = Get-Item -LiteralPath $windowsZipPath
+
+  $nsisScript = Join-Path $temp "installer\windows\nsis\wiz_work_report_tool.nsi"
+  $nsisIcon = Join-Path $temp "windows\runner\resources\app_icon.ico"
+  $windowsSetupPath = Join-Path $dist "WizWorkReport_${Version}_windows_setup.exe"
+  if (Test-Path $windowsSetupPath) {
+    Remove-Item -LiteralPath $windowsSetupPath -Force
+  }
+  $windowsSetup = Build-NSISInstaller $nsisScript $releaseDir $nsisIcon $Version $windowsSetupPath
 } finally {
   Pop-Location
 }
 
 $assets = @(
   $androidApk.FullName,
+  $windowsSetup.FullName,
   $windowsMsix.FullName,
   $windowsZip.FullName,
   $certInstallFiles.Certificate,
@@ -330,6 +393,7 @@ Ensure-GitHubRelease $tag $Version $notesFile $assets
 Write-Host ""
 Write-Host "Release completed: $tag"
 Write-Host "Android APK: $($androidApk.FullName)"
+Write-Host "Windows NSIS setup: $($windowsSetup.FullName)"
 Write-Host "Windows MSIX: $($windowsMsix.FullName)"
 Write-Host "Windows ZIP: $($windowsZip.FullName)"
 Write-Host "Windows certificate: $($certInstallFiles.Certificate)"
