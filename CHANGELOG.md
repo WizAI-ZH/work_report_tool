@@ -18,6 +18,7 @@
 - 新增 Android APK、Windows MSIX/压缩包、macOS 构建脚本和 GitHub Actions 构建工作流。
 - Windows MSIX Release 附带 `.cer` 证书和一键证书安装脚本，便于自签名包首次安装。
 - 新增 Windows NSIS `.exe` 安装包，作为普通用户推荐下载项。
+- Windows NSIS 安装包启动时支持选择安装语言，默认使用简体中文。
 
 ### 修复
 
@@ -35,4 +36,5 @@
 - 将“发送到企微”和“AI 建议”调整为主操作区优先按钮。
 - 移除多余的“生成并复制”按钮。
 - 企业微信能力改为跨平台降级策略：优先复制内容，Windows 尝试打开企业微信，其他平台提示手动粘贴。
+- Windows NSIS 安装包默认安装目录调整为 `C:\威智工作汇报器`。
 - 废弃 PyInstaller 作为主构建入口，旧 Python 文件仅保留作迁移参考。

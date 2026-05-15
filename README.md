@@ -66,7 +66,7 @@ flutter run -d <device-id>
 
 ## Windows 安装说明
 
-普通 Windows 用户建议优先下载 `WizWorkReport_<版本号>_windows_setup.exe`。这是 NSIS 安装包，不需要先安装 MSIX 证书，双击后按提示安装即可。
+普通 Windows 用户建议优先下载 `WizWorkReport_<版本号>_windows_setup.exe`。这是 NSIS 安装包，不需要先安装 MSIX 证书，双击后按提示安装即可。安装器启动时会先选择显示语言，默认是简体中文；默认安装目录为 `C:\威智工作汇报器`。
 
 Windows 的 `.msix` 安装包必须通过证书校验。当前项目使用本地自签名证书进行 MSIX 签名，因此如果选择 MSIX，需要首次安装前先信任同版本 Release 中附带的证书：
 
