@@ -15,7 +15,7 @@ import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.1.0';
+const _appVersion = '1.1.2';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -617,7 +617,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text('Android 会下载 APK 并打开系统安装页，请按系统提示确认安装。'),
+                Text(_updates.installPrompt()),
               ],
             ),
           ),
@@ -658,10 +658,12 @@ class _HomePageState extends State<HomePage> {
       switch (result) {
         case 'install_started':
           _showSnack('安装包已下载，请在系统安装页确认更新');
+        case 'installer_started':
+          _showSnack('安装包已下载并启动，请按提示完成安装');
         case 'unknown_sources':
           _showSnack('已打开安装权限设置，允许后请回到应用重新点击更新');
-        case 'opened_release':
-          _showSnack('已打开 GitHub Release 下载页');
+        case 'unsupported_platform':
+          _showSnack('当前平台暂不支持自动安装，请手动下载更新');
         default:
           _showSnack('无法自动打开安装包，请到 Release 页面手动下载');
       }

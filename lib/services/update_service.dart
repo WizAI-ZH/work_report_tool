@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class UpdateInfo {
   const UpdateInfo({
@@ -94,16 +93,35 @@ class UpdateService {
   }
 
   Future<String> downloadAndInstall(UpdateInfo update) async {
-    if (!Platform.isAndroid) {
-      final opened = await launchUrl(
-        Uri.parse(update.releaseUrl),
-        mode: LaunchMode.externalApplication,
-      );
-      return opened ? 'opened_release' : 'open_failed';
+    final file = await _downloadAsset(update);
+
+    if (Platform.isWindows) {
+      await Process.start(file.path, const [], mode: ProcessStartMode.detached);
+      return 'installer_started';
     }
 
+    if (Platform.isMacOS) {
+      await Process.start('open', [file.path], mode: ProcessStartMode.detached);
+      return 'installer_started';
+    }
+
+    if (!Platform.isAndroid) {
+      return 'unsupported_platform';
+    }
+
+    final result = await _channel.invokeMethod<String>(
+      'installApk',
+      {'path': file.path},
+    );
+    return result ?? 'unknown';
+  }
+
+  Future<File> _downloadAsset(UpdateInfo update) async {
     final directory = await getTemporaryDirectory();
     final file = File('${directory.path}/${update.assetName}');
+    if (await file.exists()) {
+      await file.delete();
+    }
     final request = http.Request('GET', Uri.parse(update.assetUrl));
     request.headers['User-Agent'] = 'WizWorkReportUpdater';
     final response = await _client.send(request);
@@ -111,12 +129,20 @@ class UpdateService {
       throw Exception('下载安装包失败：HTTP ${response.statusCode}');
     }
     await response.stream.pipe(file.openWrite());
+    return file;
+  }
 
-    final result = await _channel.invokeMethod<String>(
-      'installApk',
-      {'path': file.path},
-    );
-    return result ?? 'unknown';
+  String installPrompt() {
+    if (Platform.isAndroid) {
+      return 'Android 会自动下载 APK 并打开系统安装页，请按系统提示确认安装。';
+    }
+    if (Platform.isWindows) {
+      return 'Windows 会自动下载安装包并启动安装器，请按安装器和系统权限提示完成更新。';
+    }
+    if (Platform.isMacOS) {
+      return 'macOS 会自动下载安装包并打开，请按系统提示完成安装。';
+    }
+    return '当前平台暂不支持应用内自动安装，请到 Release 页面手动下载。';
   }
 
   static int compareVersions(String left, String right) {
