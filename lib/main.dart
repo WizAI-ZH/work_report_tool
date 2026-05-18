@@ -1398,6 +1398,7 @@ class _AiSuggestionDialogState extends State<_AiSuggestionDialog> {
   }
 
   Future<void> _regenerate() async {
+    FocusScope.of(context).unfocus();
     setState(() => _regenerating = true);
     try {
       final next = await widget.onRegenerate(_feedbackController.text.trim());
@@ -1419,58 +1420,71 @@ class _AiSuggestionDialogState extends State<_AiSuggestionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('AI 建议'),
-      content: SizedBox(
-        width: 640,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: SingleChildScrollView(
-                child: SelectableText(_suggestion),
+    final media = MediaQuery.of(context);
+    final availableHeight = media.size.height - media.viewInsets.bottom - 180;
+    final contentHeight = availableHeight.clamp(260.0, 520.0);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: AlertDialog(
+        title: const Text('AI 建议'),
+        content: SizedBox(
+          width: 640,
+          height: contentHeight,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: SelectableText(_suggestion),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text('重新生成时可填写的调整要求（可选）',
-                  style: Theme.of(context).textTheme.titleSmall),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _feedbackController,
-              minLines: 2,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: '不满意时再填，例如：明日计划更具体；不要使用“推进”这类词',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('重新生成时可填写的调整要求（可选）',
+                    style: Theme.of(context).textTheme.titleSmall),
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              TextField(
+                controller: _feedbackController,
+                minLines: 1,
+                maxLines: 3,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                decoration: const InputDecoration(
+                  hintText: '不满意时再填，例如：明日计划更具体；不要使用“推进”这类词',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+              onPressed: _regenerating ? null : () => Navigator.pop(context),
+              child: const Text('关闭')),
+          OutlinedButton.icon(
+            onPressed: _regenerating ? null : _regenerate,
+            icon: _regenerating
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+            label: Text(_regenerating ? '生成中...' : '重新生成'),
+          ),
+          FilledButton(
+            onPressed: _regenerating
+                ? null
+                : () => Navigator.pop(context, _suggestion),
+            child: const Text('应用建议'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-            onPressed: _regenerating ? null : () => Navigator.pop(context),
-            child: const Text('关闭')),
-        OutlinedButton.icon(
-          onPressed: _regenerating ? null : _regenerate,
-          icon: _regenerating
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh),
-          label: Text(_regenerating ? '生成中...' : '重新生成'),
-        ),
-        FilledButton(
-          onPressed:
-              _regenerating ? null : () => Navigator.pop(context, _suggestion),
-          child: const Text('应用建议'),
-        ),
-      ],
     );
   }
 }
