@@ -85,11 +85,15 @@ class UpdateService {
     return null;
   }
 
-  Future<String> downloadAndInstall(UpdateInfo update) async {
-    final file = await _downloadAsset(update);
+  Future<String> downloadAndInstall(
+    UpdateInfo update, {
+    void Function(double? progress, String message)? onProgress,
+  }) async {
+    final file = await _downloadAsset(update, onProgress: onProgress);
 
     if (Platform.isWindows) {
       if (file.path.toLowerCase().endsWith('.exe')) {
+        onProgress?.call(1, '下载完成，正在启动安装器...');
         await Process.start(
           file.path,
           const [],
@@ -97,6 +101,7 @@ class UpdateService {
         );
         return 'installer_started';
       }
+      onProgress?.call(1, '下载完成，正在打开文件所在位置...');
       await Process.start(
         'explorer.exe',
         ['/select,${file.path}'],
@@ -106,6 +111,7 @@ class UpdateService {
     }
 
     if (Platform.isMacOS) {
+      onProgress?.call(1, '下载完成，正在打开安装包...');
       await Process.start('open', [file.path], mode: ProcessStartMode.detached);
       return 'installer_started';
     }
@@ -114,6 +120,7 @@ class UpdateService {
       return 'unsupported_platform';
     }
 
+    onProgress?.call(1, '下载完成，正在打开系统安装页...');
     final result = await _channel.invokeMethod<String>(
       'installApk',
       {'path': file.path},
@@ -121,19 +128,42 @@ class UpdateService {
     return result ?? 'unknown';
   }
 
-  Future<File> _downloadAsset(UpdateInfo update) async {
+  Future<File> _downloadAsset(
+    UpdateInfo update, {
+    void Function(double? progress, String message)? onProgress,
+  }) async {
     final directory = await getTemporaryDirectory();
     final file = File('${directory.path}/${update.assetName}');
     if (await file.exists()) {
       await file.delete();
     }
+    onProgress?.call(0, '正在连接下载服务器...');
     final request = http.Request('GET', Uri.parse(update.assetUrl));
     request.headers['User-Agent'] = 'WizWorkReportUpdater';
     final response = await _client.send(request);
     if (response.statusCode != 200) {
       throw Exception('下载安装包失败：HTTP ${response.statusCode}');
     }
-    await response.stream.pipe(file.openWrite());
+    final totalBytes = response.contentLength;
+    var receivedBytes = 0;
+    final sink = file.openWrite();
+    try {
+      await for (final chunk in response.stream) {
+        receivedBytes += chunk.length;
+        sink.add(chunk);
+        final progress = totalBytes == null || totalBytes <= 0
+            ? null
+            : receivedBytes / totalBytes;
+        final receivedMb = (receivedBytes / 1024 / 1024).toStringAsFixed(1);
+        final totalText = totalBytes == null || totalBytes <= 0
+            ? ''
+            : ' / ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB';
+        onProgress?.call(
+            progress, '正在下载 ${update.assetName}：$receivedMb$totalText');
+      }
+    } finally {
+      await sink.close();
+    }
     return file;
   }
 

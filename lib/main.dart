@@ -15,7 +15,7 @@ import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.1.5';
+const _appVersion = '1.1.6';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -649,12 +649,25 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _installUpdate(UpdateInfo update) async {
-    setState(() => _busy = true);
+    final progress = ValueNotifier<_UpdateInstallProgress>(
+      const _UpdateInstallProgress(null, '准备下载更新...'),
+    );
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _UpdateProgressDialog(progress: progress),
+    ));
     try {
-      final result = await _updates.downloadAndInstall(update);
+      final result = await _updates.downloadAndInstall(
+        update,
+        onProgress: (value, message) {
+          progress.value = _UpdateInstallProgress(value, message);
+        },
+      );
       if (!mounted) {
         return;
       }
+      Navigator.of(context, rootNavigator: true).pop();
       switch (result) {
         case 'install_started':
           _showSnack('安装包已下载，请在系统安装页确认更新');
@@ -671,12 +684,11 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (error) {
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
         _showSnack('更新失败：$error');
       }
     } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
+      progress.dispose();
     }
   }
 
@@ -783,6 +795,56 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _UpdateInstallProgress {
+  const _UpdateInstallProgress(this.progress, this.message);
+
+  final double? progress;
+  final String message;
+}
+
+class _UpdateProgressDialog extends StatelessWidget {
+  const _UpdateProgressDialog({required this.progress});
+
+  final ValueNotifier<_UpdateInstallProgress> progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: const Text('正在更新'),
+        content: ValueListenableBuilder<_UpdateInstallProgress>(
+          valueListenable: progress,
+          builder: (context, value, _) {
+            final percent = value.progress == null
+                ? ''
+                : '${(value.progress!.clamp(0, 1) * 100).toStringAsFixed(0)}%';
+            return SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LinearProgressIndicator(value: value.progress),
+                  const SizedBox(height: 12),
+                  Text(value.message),
+                  if (percent.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(percent,
+                        style: Theme.of(context).textTheme.titleSmall),
+                  ],
+                  const SizedBox(height: 12),
+                  const Text('下载完成后会自动启动安装流程，请按系统提示确认。'),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

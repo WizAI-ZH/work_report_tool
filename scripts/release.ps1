@@ -383,7 +383,6 @@ $assets = @(
   $androidApk.FullName,
   $windowsSetup.FullName,
   $windowsMsix.FullName,
-  $windowsZip.FullName,
   $certInstallFiles.Certificate,
   $certInstallFiles.PowerShell,
   $certInstallFiles.Batch
