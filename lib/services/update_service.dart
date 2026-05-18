@@ -68,25 +68,18 @@ class UpdateService {
   }
 
   Map<String, dynamic>? _preferredAsset(List<Map<String, dynamic>> assets) {
-    bool matches(String name) {
-      final lower = name.toLowerCase();
-      if (Platform.isAndroid) {
-        return lower.endsWith('_android.apk') || lower.endsWith('.apk');
-      }
-      if (Platform.isWindows) {
-        return lower.endsWith('_windows_setup.exe') ||
-            lower.endsWith('_windows.zip');
-      }
-      if (Platform.isMacOS) {
-        return lower.endsWith('.dmg') || lower.endsWith('.pkg');
-      }
-      return false;
-    }
+    final preferredSuffixes = <String>[
+      if (Platform.isAndroid) ...['_android.apk', '.apk'],
+      if (Platform.isWindows) ...['_windows_setup.exe', '.exe', '_windows.zip'],
+      if (Platform.isMacOS) ...['.dmg', '.pkg'],
+    ];
 
-    for (final asset in assets) {
-      final name = asset['name'] as String? ?? '';
-      if (matches(name)) {
-        return asset;
+    for (final suffix in preferredSuffixes) {
+      for (final asset in assets) {
+        final name = (asset['name'] as String? ?? '').toLowerCase();
+        if (name.endsWith(suffix)) {
+          return asset;
+        }
       }
     }
     return null;
@@ -96,8 +89,20 @@ class UpdateService {
     final file = await _downloadAsset(update);
 
     if (Platform.isWindows) {
-      await Process.start(file.path, const [], mode: ProcessStartMode.detached);
-      return 'installer_started';
+      if (file.path.toLowerCase().endsWith('.exe')) {
+        await Process.start(
+          file.path,
+          const [],
+          mode: ProcessStartMode.detached,
+        );
+        return 'installer_started';
+      }
+      await Process.start(
+        'explorer.exe',
+        ['/select,${file.path}'],
+        mode: ProcessStartMode.detached,
+      );
+      return 'downloaded_only';
     }
 
     if (Platform.isMacOS) {
