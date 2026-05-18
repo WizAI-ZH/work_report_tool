@@ -370,6 +370,7 @@ try {
 
   $nsisScript = Join-Path $temp "installer\windows\nsis\wiz_work_report_tool.nsi"
   $nsisIcon = Join-Path $temp "windows\runner\resources\app_icon.ico"
+  Copy-Item -LiteralPath (Join-Path $temp "README.md") -Destination (Join-Path $releaseDir "README.md") -Force
   $windowsSetupPath = Join-Path $dist "WizWorkReport_${Version}_windows_setup.exe"
   if (Test-Path $windowsSetupPath) {
     Remove-Item -LiteralPath $windowsSetupPath -Force

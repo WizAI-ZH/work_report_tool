@@ -2,6 +2,9 @@
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
+!include "FileFunc.nsh"
+
+!insertmacro GetParameters
 
 !ifndef VERSION
   !define VERSION "0.0.0"
@@ -34,6 +37,11 @@ SetCompressor /SOLID lzma
   !define MUI_UNICON "${ICON_PATH}"
 !endif
 
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
+!define MUI_FINISHPAGE_RUN_TEXT "启动 ${APP_NAME}"
+!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\README.md"
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "查看 README"
+
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -50,17 +58,24 @@ SetCompressor /SOLID lzma
 !define MUI_LANGDLL_REGISTRY_VALUENAME "Installer Language"
 
 Function .onInit
+  ${GetParameters} $1
   UserInfo::GetAccountType
   Pop $0
   ${If} $0 != "Admin"
-    ExecShell "runas" "$EXEPATH"
+    ExecShell "runas" "$EXEPATH" "$1"
     Quit
   ${EndIf}
+  IfSilent skipLanguage
   !insertmacro MUI_LANGDLL_DISPLAY
+skipLanguage:
 FunctionEnd
 
 Section "Install"
   SetShellVarContext all
+  IfSilent 0 installFiles
+    nsExec::ExecToLog 'taskkill /IM "${APP_EXE}" /F'
+
+installFiles:
   SetOutPath "$INSTDIR"
   File /r "${SOURCE_DIR}\*.*"
 
@@ -79,6 +94,11 @@ Section "Install"
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
+
+  IfSilent 0 installDone
+    Exec "$INSTDIR\${APP_EXE}"
+
+installDone:
 SectionEnd
 
 Section "Uninstall"

@@ -30,7 +30,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('威智工作汇报器'), findsOneWidget);
-    expect(find.text('v1.1.7'), findsOneWidget);
+    expect(find.text('v1.1.8'), findsOneWidget);
     expect(find.byIcon(Icons.settings_suggest_outlined), findsOneWidget);
     expect(find.byIcon(Icons.tune), findsOneWidget);
     expect(find.byIcon(Icons.history), findsOneWidget);

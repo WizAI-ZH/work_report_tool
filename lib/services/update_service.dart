@@ -96,7 +96,7 @@ class UpdateService {
         onProgress?.call(1, '下载完成，正在启动安装器...');
         await Process.start(
           file.path,
-          const [],
+          const ['/S'],
           mode: ProcessStartMode.detached,
         );
         return 'installer_started';
