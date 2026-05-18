@@ -1,6 +1,7 @@
 ﻿Unicode true
 
 !include "MUI2.nsh"
+!include "LogicLib.nsh"
 
 !ifndef VERSION
   !define VERSION "0.0.0"
@@ -23,7 +24,7 @@ Name "${APP_NAME}"
 OutFile "${OUT_FILE}"
 InstallDir "C:\${APP_NAME}"
 InstallDirRegKey HKLM "Software\${APP_ID}" "InstallDir"
-RequestExecutionLevel admin
+RequestExecutionLevel user
 SetCompressor /SOLID lzma
 
 !define MUI_ABORTWARNING
@@ -49,6 +50,12 @@ SetCompressor /SOLID lzma
 !define MUI_LANGDLL_REGISTRY_VALUENAME "Installer Language"
 
 Function .onInit
+  UserInfo::GetAccountType
+  Pop $0
+  ${If} $0 != "Admin"
+    ExecShell "runas" "$EXEPATH"
+    Quit
+  ${EndIf}
   !insertmacro MUI_LANGDLL_DISPLAY
 FunctionEnd
 
