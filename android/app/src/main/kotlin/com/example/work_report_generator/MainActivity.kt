@@ -17,6 +17,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "openEnterpriseWechat" -> result.success(openEnterpriseWechat())
+                    "getSupportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
                     "installApk" -> {
                         val path = call.argument<String>("path")
                         result.success(installApk(path))

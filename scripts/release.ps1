@@ -346,6 +346,18 @@ try {
     (Join-Path $temp "build\app\outputs\flutter-apk\app-release.apk") `
     (Join-Path $dist "WizWorkReport_${Version}_android.apk")
 
+  flutter build apk --release --split-per-abi
+  Assert-LastExitCode "flutter build apk --split-per-abi"
+  $androidArm64Apk = Copy-ReleaseArtifact `
+    (Join-Path $temp "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk") `
+    (Join-Path $dist "WizWorkReport_${Version}_android_arm64-v8a.apk")
+  $androidArmV7Apk = Copy-ReleaseArtifact `
+    (Join-Path $temp "build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk") `
+    (Join-Path $dist "WizWorkReport_${Version}_android_armeabi-v7a.apk")
+  $androidX64Apk = Copy-ReleaseArtifact `
+    (Join-Path $temp "build\app\outputs\flutter-apk\app-x86_64-release.apk") `
+    (Join-Path $dist "WizWorkReport_${Version}_android_x86_64.apk")
+
   flutter build windows --release
   Assert-LastExitCode "flutter build windows"
   flutter pub run msix:create --build-windows false --install-certificate false --certificate-path $certInfo.PfxPath --certificate-password $certInfo.Password
@@ -382,6 +394,9 @@ try {
 
 $assets = @(
   $androidApk.FullName,
+  $androidArm64Apk.FullName,
+  $androidArmV7Apk.FullName,
+  $androidX64Apk.FullName,
   $windowsSetup.FullName,
   $windowsMsix.FullName,
   $certInstallFiles.Certificate,
@@ -393,6 +408,9 @@ Ensure-GitHubRelease $tag $Version $notesFile $assets
 Write-Host ""
 Write-Host "Release completed: $tag"
 Write-Host "Android APK: $($androidApk.FullName)"
+Write-Host "Android arm64-v8a APK: $($androidArm64Apk.FullName)"
+Write-Host "Android armeabi-v7a APK: $($androidArmV7Apk.FullName)"
+Write-Host "Android x86_64 APK: $($androidX64Apk.FullName)"
 Write-Host "Windows NSIS setup: $($windowsSetup.FullName)"
 Write-Host "Windows MSIX: $($windowsMsix.FullName)"
 Write-Host "Windows ZIP: $($windowsZip.FullName)"

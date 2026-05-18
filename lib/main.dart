@@ -15,7 +15,7 @@ import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.1.9';
+const _appVersion = '1.1.10';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +64,7 @@ class _HomePageState extends State<HomePage> {
   final _dateController = TextEditingController();
   final _outputController = TextEditingController();
   final _fieldControllers = <String, TextEditingController>{};
+  final _compactMoreKey = GlobalKey();
 
   var _template = ReportService.defaultTemplate;
   var _aiConfig = AiConfig.defaults;
@@ -694,44 +695,25 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= 900;
+    final compactTopBar = width < 700;
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_appName),
-            Text('v$_appVersion', style: TextStyle(fontSize: 12)),
-          ],
-        ),
+        automaticallyImplyLeading: false,
+        titleSpacing: compactTopBar ? 12 : null,
+        title: compactTopBar
+            ? _compactTitleBar()
+            : const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_appName, maxLines: 1, overflow: TextOverflow.visible),
+                  Text('v$_appVersion', style: TextStyle(fontSize: 12)),
+                ],
+              ),
         foregroundColor: Theme.of(context).colorScheme.onSurface,
-        actions: [
-          TextButton.icon(
-              onPressed: _checkingUpdate
-                  ? null
-                  : () => _checkForUpdates(silent: false),
-              icon: _checkingUpdate
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.system_update_alt),
-              label: const Text('更新')),
-          TextButton.icon(
-              onPressed: _configureAi,
-              icon: const Icon(Icons.settings_suggest_outlined),
-              label: const Text('AI')),
-          TextButton.icon(
-              onPressed: _editTemplate,
-              icon: const Icon(Icons.tune),
-              label: const Text('模板')),
-          TextButton.icon(
-              onPressed: _historyTokens.isEmpty ? null : _showHistory,
-              icon: const Icon(Icons.history),
-              label: const Text('历史')),
-        ],
+        actions: compactTopBar ? const [] : _wideAppBarActions(),
       ),
       body: _busy
           ? const Center(child: CircularProgressIndicator())
@@ -797,7 +779,134 @@ class _HomePageState extends State<HomePage> {
             ),
     );
   }
+
+  List<Widget> _wideAppBarActions() => [
+        TextButton.icon(
+            onPressed:
+                _checkingUpdate ? null : () => _checkForUpdates(silent: false),
+            icon: _checkingUpdate
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.system_update_alt),
+            label: const Text('更新')),
+        TextButton.icon(
+            onPressed: _configureAi,
+            icon: const Icon(Icons.settings_suggest_outlined),
+            label: const Text('AI')),
+        TextButton.icon(
+            onPressed: _editTemplate,
+            icon: const Icon(Icons.tune),
+            label: const Text('模板')),
+        TextButton.icon(
+            onPressed: _historyTokens.isEmpty ? null : _showHistory,
+            icon: const Icon(Icons.history),
+            label: const Text('历史')),
+      ];
+
+  Widget _compactTitleBar() => Row(
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_appName, maxLines: 1, overflow: TextOverflow.visible),
+                Text('v$_appVersion', style: TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+          ..._compactAppBarActions(),
+        ],
+      );
+
+  List<Widget> _compactAppBarActions() => [
+        IconButton(
+          tooltip: '检查更新',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 42, height: 48),
+          onPressed:
+              _checkingUpdate ? null : () => _checkForUpdates(silent: false),
+          icon: _checkingUpdate
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.system_update_alt),
+        ),
+        IconButton(
+          key: _compactMoreKey,
+          tooltip: '更多',
+          icon: const Icon(Icons.more_vert),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 42, height: 48),
+          onPressed: _showCompactTopBarMenu,
+        ),
+      ];
+
+  Future<void> _showCompactTopBarMenu() async {
+    final menuContext = _compactMoreKey.currentContext;
+    if (menuContext == null) {
+      return;
+    }
+    final button = menuContext.findRenderObject() as RenderBox;
+    final overlay =
+        Overlay.of(menuContext).context.findRenderObject() as RenderBox;
+    final topLeft = button.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomRight = button
+        .localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay);
+    final selected = await showMenu<_TopBarMenuAction>(
+      context: menuContext,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(topLeft, bottomRight),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        const PopupMenuItem(
+          value: _TopBarMenuAction.ai,
+          child: ListTile(
+            leading: Icon(Icons.settings_suggest_outlined),
+            title: Text('AI'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: _TopBarMenuAction.template,
+          child: ListTile(
+            leading: Icon(Icons.tune),
+            title: Text('模板'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem(
+          value: _TopBarMenuAction.history,
+          enabled: _historyTokens.isNotEmpty,
+          child: const ListTile(
+            leading: Icon(Icons.history),
+            title: Text('历史'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+    );
+    switch (selected) {
+      case _TopBarMenuAction.ai:
+        _configureAi();
+      case _TopBarMenuAction.template:
+        _editTemplate();
+      case _TopBarMenuAction.history:
+        _showHistory();
+      case null:
+        break;
+    }
+  }
 }
+
+enum _TopBarMenuAction { ai, template, history }
 
 class _UpdateInstallProgress {
   const _UpdateInstallProgress(this.progress, this.message);

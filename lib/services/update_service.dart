@@ -53,7 +53,7 @@ class UpdateService {
     final assets = (data['assets'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
         .toList();
-    final asset = _preferredAsset(assets);
+    final asset = await _preferredAsset(assets);
     if (asset == null) {
       throw Exception('发现新版本，但没有找到当前平台可用的安装包');
     }
@@ -67,9 +67,15 @@ class UpdateService {
     );
   }
 
-  Map<String, dynamic>? _preferredAsset(List<Map<String, dynamic>> assets) {
+  Future<Map<String, dynamic>?> _preferredAsset(
+      List<Map<String, dynamic>> assets) async {
+    final androidAbiSuffixes = await _androidAbiAssetSuffixes();
     final preferredSuffixes = <String>[
-      if (Platform.isAndroid) ...['_android.apk', '.apk'],
+      if (Platform.isAndroid) ...[
+        ...androidAbiSuffixes,
+        '_android.apk',
+        '.apk',
+      ],
       if (Platform.isWindows) ...['_windows_setup.exe', '.exe', '_windows.zip'],
       if (Platform.isMacOS) ...['.dmg', '.pkg'],
     ];
@@ -83,6 +89,23 @@ class UpdateService {
       }
     }
     return null;
+  }
+
+  Future<List<String>> _androidAbiAssetSuffixes() async {
+    if (!Platform.isAndroid) {
+      return const [];
+    }
+    try {
+      final abis = await _channel.invokeListMethod<String>('getSupportedAbis');
+      final supported = abis ?? const [];
+      const knownAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64'];
+      return [
+        for (final abi in knownAbis)
+          if (supported.contains(abi)) '_android_$abi.apk',
+      ];
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<String> downloadAndInstall(
