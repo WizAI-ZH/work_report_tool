@@ -1,20 +1,23 @@
 name: work_report_generator
 description: Cross-platform work report generator for Windows, macOS, and Android.
 publish_to: "none"
-version: 1.1.12+14
+version: 1.2.0+15
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
+  file_picker: ^11.0.2
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
   http: ^1.2.2
   intl: ^0.20.2
+  mobile_scanner: ^7.2.0
   path: ^1.9.0
   path_provider: ^2.1.4
+  qr_flutter: ^4.1.0
   url_launcher: ^6.3.0
   web: ^1.1.1
 
@@ -37,5 +40,5 @@ msix_config:
   display_name: 威智工作汇报器
   publisher_display_name: Wiz
   identity_name: WizWorkReportGenerator
-  msix_version: 1.1.12.0
+  msix_version: 1.2.0.0
   logo_path: wiz_work_repo_tool_logo.png

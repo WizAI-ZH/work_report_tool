@@ -1,21 +1,26 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'models/report_models.dart';
 import 'services/ai_service.dart';
 import 'services/report_service.dart';
 import 'services/storage_service.dart';
+import 'services/sync_service.dart';
 import 'services/update_service.dart';
 import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.1.12';
+const _appVersion = '1.2.0';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +63,7 @@ class _HomePageState extends State<HomePage> {
   final _ai = AiService();
   final _wechat = WechatService();
   final _updates = UpdateService();
+  final _sync = SyncService();
 
   final _userController = TextEditingController();
   final _deptController = TextEditingController();
@@ -325,6 +331,288 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _showSyncTools() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('导入与同步'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.upload_file),
+                title: const Text('导出同步文件'),
+                subtitle: const Text('包含当前草稿和历史记录'),
+                onTap: () {
+                  Navigator.pop(dialogContext);
+                  _exportSyncFile();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_open),
+                title: const Text('导入同步文件'),
+                subtitle: const Text('支持 .wizsync.json 和历史 JSON'),
+                onTap: () {
+                  Navigator.pop(dialogContext);
+                  _importSyncFile();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.qr_code_2),
+                title: const Text('生成同步二维码'),
+                subtitle: const Text('仅同步当前编辑内容'),
+                onTap: () {
+                  Navigator.pop(dialogContext);
+                  _showDraftQr();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.qr_code_scanner),
+                title: const Text('扫码导入'),
+                subtitle: const Text('读取电脑端生成的草稿二维码'),
+                onTap: () {
+                  Navigator.pop(dialogContext);
+                  _scanDraftQr();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.content_paste),
+                title: const Text('从剪贴板导入汇报'),
+                subtitle: const Text('粘贴已生成汇报文本'),
+                onTap: () {
+                  Navigator.pop(dialogContext);
+                  _importFromClipboard();
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('关闭')),
+        ],
+      ),
+    );
+  }
+
+  SyncDraft _currentSyncDraft() {
+    return SyncDraft(
+      user: _userController.text.trim(),
+      department: _deptController.text.trim(),
+      date: _dateController.text.trim(),
+      fields: {
+        for (final entry in _fieldControllers.entries)
+          entry.key: entry.value.text,
+      },
+      report: _outputController.text,
+    );
+  }
+
+  Future<List<ReportRecord>> _loadAllHistoryRecords() async {
+    final records = <ReportRecord>[];
+    for (final token in await _storage.loadHistoryTokens()) {
+      final record = await _storage.loadHistoryDetail(token);
+      if (record != null) {
+        records.add(record);
+      }
+    }
+    return records;
+  }
+
+  Future<void> _exportSyncFile() async {
+    try {
+      final document = SyncDocument(
+        kind: 'full',
+        draft: _currentSyncDraft(),
+        history: await _loadAllHistoryRecords(),
+        appVersion: _appVersion,
+        createdAt: DateTime.now(),
+      );
+      final now = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final fileName = 'WizWorkReportSync_$now.wizsync.json';
+      final savedPath = await FilePicker.saveFile(
+        dialogTitle: '保存同步文件',
+        fileName: fileName,
+        bytes: Uint8List.fromList(utf8.encode(_sync.encodeDocument(document))),
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnack(savedPath == null ? '已取消导出' : '同步文件已导出');
+    } catch (error) {
+      if (mounted) {
+        _showSnack('导出同步文件失败：$error');
+      }
+    }
+  }
+
+  Future<void> _importSyncFile() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        dialogTitle: '选择同步文件',
+        type: FileType.custom,
+        allowedExtensions: ['json', 'wizsync'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+      final bytes = result.files.single.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw const FormatException('未读取到文件内容');
+      }
+      await _importRawSyncContent(utf8.decode(bytes));
+    } catch (error) {
+      if (mounted) {
+        _showSnack('导入失败：$error');
+      }
+    }
+  }
+
+  Future<void> _importFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (text.isEmpty) {
+      _showSnack('剪贴板没有可导入的文本');
+      return;
+    }
+    try {
+      await _importRawSyncContent(text);
+    } catch (error) {
+      if (mounted) {
+        _showSnack('导入失败：$error');
+      }
+    }
+  }
+
+  Future<void> _importRawSyncContent(String raw) async {
+    final result = _sync.importAny(raw, template: _template);
+    await _applySyncImport(result);
+  }
+
+  Future<void> _applySyncImport(SyncImportResult result) async {
+    for (final key in result.draft.fields.keys) {
+      _fieldControllers.putIfAbsent(key, () {
+        final controller = TextEditingController();
+        if (_draftListenersAttached) {
+          controller.addListener(_onDraftChanged);
+        }
+        return controller;
+      });
+    }
+    _userController.text = result.draft.user;
+    _deptController.text = result.draft.department;
+    _dateController.text = result.draft.date;
+    for (final entry in result.draft.fields.entries) {
+      _fieldControllers[entry.key]?.text = entry.value;
+    }
+    _outputController.text = result.draft.report;
+    await _storage.saveImportedHistory(
+      result.history,
+      (record) =>
+          _reports.reportToken(record.user, record.department, record.date),
+    );
+    await _saveDraftQuietly();
+    final history = await _storage.loadHistoryTokens();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _historyTokens = history);
+    final suffix =
+        result.history.isEmpty ? '' : '，已合并 ${result.history.length} 条历史';
+    _showSnack('${result.message}$suffix');
+  }
+
+  Future<void> _showDraftQr() async {
+    try {
+      final qrValue = _sync.encodeQrDraft(_currentSyncDraft(), _appVersion);
+      if (!mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('同步二维码'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                QrImageView(data: qrValue, size: 260),
+                const SizedBox(height: 12),
+                const Text('手机端点击“扫码导入”读取当前编辑内容'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('关闭')),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        _showSnack('$error');
+      }
+    }
+  }
+
+  Future<void> _scanDraftQr() async {
+    var captured = false;
+    String? rawValue;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('扫码导入'),
+        content: SizedBox(
+          width: 360,
+          height: 420,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: MobileScanner(
+              onDetect: (capture) {
+                if (captured) {
+                  return;
+                }
+                String? value;
+                for (final barcode in capture.barcodes) {
+                  if (barcode.rawValue != null) {
+                    value = barcode.rawValue;
+                    break;
+                  }
+                }
+                if (value == null) {
+                  return;
+                }
+                captured = true;
+                rawValue = value;
+                Navigator.pop(context);
+              },
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        ],
+      ),
+    );
+    if (rawValue == null) {
+      return;
+    }
+    try {
+      await _importRawSyncContent(rawValue!);
+    } catch (error) {
+      if (mounted) {
+        _showSnack('扫码导入失败：$error');
+      }
+    }
   }
 
   Future<void> _editTemplate() async {
@@ -797,6 +1085,10 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.settings_suggest_outlined),
             label: const Text('AI')),
         TextButton.icon(
+            onPressed: _showSyncTools,
+            icon: const Icon(Icons.sync),
+            label: const Text('同步')),
+        TextButton.icon(
             onPressed: _editTemplate,
             icon: const Icon(Icons.tune),
             label: const Text('模板')),
@@ -875,6 +1167,14 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const PopupMenuItem(
+          value: _TopBarMenuAction.sync,
+          child: ListTile(
+            leading: Icon(Icons.sync),
+            title: Text('同步'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
           value: _TopBarMenuAction.template,
           child: ListTile(
             leading: Icon(Icons.tune),
@@ -896,6 +1196,8 @@ class _HomePageState extends State<HomePage> {
     switch (selected) {
       case _TopBarMenuAction.ai:
         _configureAi();
+      case _TopBarMenuAction.sync:
+        _showSyncTools();
       case _TopBarMenuAction.template:
         _editTemplate();
       case _TopBarMenuAction.history:
@@ -906,7 +1208,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-enum _TopBarMenuAction { ai, template, history }
+enum _TopBarMenuAction { ai, sync, template, history }
 
 class _UpdateInstallProgress {
   const _UpdateInstallProgress(this.progress, this.message);

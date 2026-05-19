@@ -5,6 +5,7 @@ import 'package:work_report_generator/models/report_models.dart';
 import 'package:work_report_generator/services/ai_service.dart';
 import 'package:work_report_generator/services/report_service.dart';
 import 'package:work_report_generator/services/storage_service.dart';
+import 'package:work_report_generator/services/sync_service.dart';
 import 'package:work_report_generator/services/update_service.dart';
 
 void main() {
@@ -197,6 +198,27 @@ void main() {
       expect(draft['department'], '研发部');
       expect(draft['field_today_work'], '完成联调');
     });
+
+    test('imports history records with generated tokens', () async {
+      const record = ReportRecord(
+        user: '李四',
+        department: '产品部',
+        date: '2026-05-19',
+        fields: {'today_work': 'a. 整理需求'},
+        report: 'report body',
+      );
+
+      await storage.saveImportedHistory(
+        const [record],
+        (item) =>
+            ReportService().reportToken(item.user, item.department, item.date),
+      );
+
+      final tokens = await storage.loadHistoryTokens();
+      final loaded = await storage.loadHistoryDetail(tokens.single);
+      expect(tokens.single, '李四_产品部_2026-05-19');
+      expect(loaded?.fields['today_work'], 'a. 整理需求');
+    });
   });
 
   group('AiService', () {
@@ -218,6 +240,82 @@ void main() {
       expect(UpdateService.compareVersions('1.1.0', '1.0.9'), greaterThan(0));
       expect(UpdateService.compareVersions('1.1.0', '1.1.0'), 0);
       expect(UpdateService.compareVersions('1.0.9', '1.1.0'), lessThan(0));
+    });
+  });
+
+  group('SyncService', () {
+    final sync = SyncService();
+
+    test('parses generated report text into draft record', () {
+      final record = sync.parseGeneratedReport(
+        '姓名：张三  部门：研发部  汇报日期：2026-05-19\n'
+        '====================================================\n'
+        '1、今日工作完成情况：\n'
+        'a. 完成接口\n'
+        '2、明日工作计划：\n'
+        'a. 继续测试',
+        template: ReportService.defaultTemplate,
+      );
+
+      expect(record.user, '张三');
+      expect(record.department, '研发部');
+      expect(record.date, '2026-05-19');
+      expect(record.fields['today_work'], 'a. 完成接口');
+      expect(record.fields['tomorrow_plan'], 'a. 继续测试');
+    });
+
+    test('encodes and decodes full sync document with history', () {
+      const record = ReportRecord(
+        user: '张三',
+        department: '研发部',
+        date: '2026-05-19',
+        fields: {'today_work': 'a. 完成接口'},
+        report: 'report body',
+      );
+      final document = SyncDocument(
+        kind: 'full',
+        draft: SyncDraft.fromRecord(record),
+        history: const [record],
+        appVersion: '1.2.0',
+        createdAt: DateTime(2026, 5, 19),
+      );
+
+      final decoded = sync.decodeDocument(sync.encodeDocument(document));
+
+      expect(decoded.kind, 'full');
+      expect(decoded.draft.user, '张三');
+      expect(decoded.history.single.report, 'report body');
+    });
+
+    test('encodes and imports qr draft payload', () {
+      const draft = SyncDraft(
+        user: '李四',
+        department: '产品部',
+        date: '2026-05-19',
+        fields: {'tomorrow_plan': 'a. 整理需求'},
+        report: 'report body',
+      );
+
+      final result = sync.importAny(
+        sync.encodeQrDraft(draft, '1.2.0'),
+        template: ReportService.defaultTemplate,
+      );
+
+      expect(result.draft.user, '李四');
+      expect(result.draft.fields['tomorrow_plan'], 'a. 整理需求');
+      expect(result.history, isEmpty);
+    });
+
+    test('rejects invalid import content', () {
+      expect(
+        () => sync.importAny('', template: ReportService.defaultTemplate),
+        throwsFormatException,
+      );
+      expect(
+        () => sync.importAny('not a report',
+            template: ReportService.defaultTemplate),
+        throwsFormatException,
+      );
     });
   });
 }

@@ -81,6 +81,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "4.1.0"
+  cross_file:
+    dependency: transitive
+    description:
+      name: cross_file
+      sha256: "28bb3ae56f117b5aec029d702a90f57d285cd975c3c5c281eaca38dbc47c5937"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.3.5+2"
   crypto:
     dependency: transitive
     description:
@@ -89,6 +97,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "3.0.7"
+  dbus:
+    dependency: transitive
+    description:
+      name: dbus
+      sha256: d0c98dcd4f5169878b6cf8f6e0a52403a9dff371a3e2f019697accbf6f44a270
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.7.12"
   fake_async:
     dependency: transitive
     description:
@@ -113,6 +129,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "7.0.1"
+  file_picker:
+    dependency: "direct main"
+    description:
+      name: file_picker
+      sha256: f13a03000d942e476bc1ff0a736d2e9de711d2f89a95cd4c1d88f861c3348387
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "11.0.2"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -131,6 +155,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_plugin_android_lifecycle:
+    dependency: transitive
+    description:
+      name: flutter_plugin_android_lifecycle
+      sha256: "38d1c268de9097ff59cf0e844ac38759fc78f76836d37edad06fa21e182055a0"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "2.0.34"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -261,6 +293,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.17.0"
+  mobile_scanner:
+    dependency: "direct main"
+    description:
+      name: mobile_scanner
+      sha256: c92c26bf2231695b6d3477c8dcf435f51e28f87b1745966b1fe4c47a286171ce
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "7.2.0"
   msix:
     dependency: "direct dev"
     description:
@@ -389,6 +429,22 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.2.0"
+  qr:
+    dependency: transitive
+    description:
+      name: qr
+      sha256: "5a1d2586170e172b8a8c8470bbbffd5eb0cd38a66c0d77155ea138d3af3a4445"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "3.0.2"
+  qr_flutter:
+    dependency: "direct main"
+    description:
+      name: qr_flutter
+      sha256: "5095f0fc6e3f71d08adef8feccc8cea4f12eec18a2e31c2e8d82cb6019f4b097"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "4.1.0"
   record_use:
     dependency: transitive
     description:
@@ -546,6 +602,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.1.1"
+  win32:
+    dependency: transitive
+    description:
+      name: win32
+      sha256: d7cb55e04cd34096cd3a79b3330245f54cb96a370a1c27adb3c84b917de8b08e
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "5.15.0"
   xdg_directories:
     dependency: transitive
     description:

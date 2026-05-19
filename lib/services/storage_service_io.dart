@@ -112,6 +112,13 @@ class StorageService {
         record.fields['tomorrow_plan'] ?? '');
   }
 
+  Future<void> saveImportedHistory(Iterable<ReportRecord> records,
+      String Function(ReportRecord) tokenFor) async {
+    for (final record in records) {
+      await saveReport(tokenFor(record), record);
+    }
+  }
+
   Future<List<TaskItem>> loadTasks() async {
     final document = await _loadTaskDocument();
     final rawTasks = document['tasks'];

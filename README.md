@@ -1,6 +1,6 @@
 # 威智工作汇报器
 
-威智工作汇报器是一款用于快速生成每日工作汇报的跨平台应用，当前版本为 `1.1.12`。应用基于 Flutter 开发，目标支持 Windows、Android 和 macOS；仓库中仍保留旧版 Python/Tkinter 文件，作为功能迁移和对照参考。
+威智工作汇报器是一款用于快速生成每日工作汇报的跨平台应用，当前版本为 `1.2.0`。应用基于 Flutter 开发，目标支持 Windows、Android 和 macOS；仓库中仍保留旧版 Python/Tkinter 文件，作为功能迁移和对照参考。
 
 ## 功能特性
 
@@ -10,6 +10,7 @@
 - 支持 AI 配置，包括 API Key、API URL、模型、获取模型和测试连接。
 - 首次启动会引导配置 API Key，并提供免费 API Key 获取地址。
 - 自动保存历史记录、草稿、任务追踪数据和模板配置。
+- 支持导入已生成汇报，并通过同步文件或二维码在电脑和手机之间同步当前内容。
 - 启动时自动检查 GitHub Release 新版本，并在下载更新时显示进度。
 - Android 自动更新会优先下载当前设备 CPU 架构对应的分包 APK，减少下载体积。
 - 内置中文日期选择和中文界面文案。
@@ -100,15 +101,16 @@ Windows 的 `.msix` 安装包必须通过证书校验。当前项目使用本地
 
 发布脚本会把本地打包结果放在 `dist` 目录，例如：
 
-- `WizWorkReport_1.1.12_android.apk`
-- `WizWorkReport_1.1.12_android_arm64-v8a.apk`
-- `WizWorkReport_1.1.12_android_armeabi-v7a.apk`
-- `WizWorkReport_1.1.12_android_x86_64.apk`
-- `WizWorkReport_1.1.12_windows_setup.exe`
-- `WizWorkReport_1.1.12_windows.msix`
-- `WizWorkReport_1.1.12_windows.cer`
-- `Install-WizWorkReport_1.1.12_Certificate.bat`
+- `WizWorkReport_1.2.0_android.apk`
+- `WizWorkReport_1.2.0_android_arm64-v8a.apk`
+- `WizWorkReport_1.2.0_android_armeabi-v7a.apk`
+- `WizWorkReport_1.2.0_android_x86_64.apk`
+- `WizWorkReport_1.2.0_windows_setup.exe`
+- `WizWorkReport_1.2.0_windows.msix`
+- `WizWorkReport_1.2.0_windows.cer`
+- `Install-WizWorkReport_1.2.0_Certificate.bat`
 
 ## 许可
 
 本仓库为内部工作流工具项目，使用和分发请遵循仓库所属组织的要求。
+

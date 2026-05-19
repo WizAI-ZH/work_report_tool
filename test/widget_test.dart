@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:work_report_generator/main.dart';
+import 'package:work_report_generator/models/report_models.dart';
 import 'package:work_report_generator/services/storage_service.dart';
+import 'package:work_report_generator/services/update_service.dart';
 
 void main() {
   late Directory tempDir;
@@ -12,6 +14,15 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp('work_report_widget_test_');
     StorageService.debugBaseDirectory = tempDir;
     StorageService.skipLegacyImport = true;
+    UpdateService.debugSkipNetwork = true;
+    await StorageService(baseDirectory: tempDir).saveAiConfig(
+      const AiConfig(
+        apiKey: 'test-key',
+        apiUrl: 'https://example.test/v1/chat/completions',
+        model: 'test-model',
+        availableModels: ['test-model'],
+      ),
+    );
   });
 
   tearDown(() async {
@@ -20,6 +31,7 @@ void main() {
     }
     StorageService.debugBaseDirectory = null;
     StorageService.skipLegacyImport = false;
+    UpdateService.debugSkipNetwork = false;
   });
 
   testWidgets('home page starts and shows top-level actions', (tester) async {
@@ -33,8 +45,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('威智工作汇报器'), findsOneWidget);
-    expect(find.text('v1.1.12'), findsOneWidget);
+    expect(find.text('v1.2.0'), findsOneWidget);
     expect(find.byIcon(Icons.settings_suggest_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.sync), findsOneWidget);
     expect(find.byIcon(Icons.tune), findsOneWidget);
     expect(find.byIcon(Icons.history), findsOneWidget);
   });
@@ -51,7 +64,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('威智工作汇报器'), findsOneWidget);
-    expect(find.text('v1.1.12'), findsOneWidget);
+    expect(find.text('v1.2.0'), findsOneWidget);
     expect(find.byIcon(Icons.system_update_alt), findsOneWidget);
     expect(find.byIcon(Icons.more_vert), findsOneWidget);
     expect(find.byIcon(Icons.tune), findsNothing);
@@ -59,6 +72,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('AI'), findsOneWidget);
+    expect(find.text('同步'), findsOneWidget);
     expect(find.text('模板'), findsOneWidget);
     expect(find.text('历史'), findsOneWidget);
   });

@@ -24,6 +24,8 @@ class UpdateInfo {
 class UpdateService {
   UpdateService({http.Client? client}) : _client = client ?? http.Client();
 
+  static bool debugSkipNetwork = false;
+
   static const _channel = MethodChannel('work_report_generator/platform');
   static const _latestReleaseUrl =
       'https://api.github.com/repos/WizAI-ZH/work_report_tool/releases/latest';
@@ -31,6 +33,9 @@ class UpdateService {
   final http.Client _client;
 
   Future<UpdateInfo?> fetchLatest({required String currentVersion}) async {
+    if (debugSkipNetwork) {
+      return null;
+    }
     final response = await _client.get(
       Uri.parse(_latestReleaseUrl),
       headers: const {

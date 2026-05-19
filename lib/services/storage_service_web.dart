@@ -61,6 +61,13 @@ class StorageService {
         record.fields['tomorrow_plan'] ?? '');
   }
 
+  Future<void> saveImportedHistory(Iterable<ReportRecord> records,
+      String Function(ReportRecord) tokenFor) async {
+    for (final record in records) {
+      await saveReport(tokenFor(record), record);
+    }
+  }
+
   Future<List<String>> loadHistoryTokens() async {
     final decoded = _readJson('history_tokens');
     if (decoded is List) {
