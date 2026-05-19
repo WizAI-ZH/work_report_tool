@@ -20,7 +20,7 @@ import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.2.0';
+const _appVersion = '1.2.1';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -109,8 +109,10 @@ class _HomePageState extends State<HomePage> {
       for (final item in template) {
         _fieldControllers.putIfAbsent(item.key, () => TextEditingController());
       }
-      _applyDraft(draft, template);
-      final hasSavedTomorrowPlan = draft.containsKey('field_tomorrow_plan');
+      final preparedDraft = _reports.rollDraftToTodayIfNeeded(draft);
+      _applyDraft(preparedDraft, template);
+      final hasSavedTomorrowPlan =
+          preparedDraft.containsKey('field_tomorrow_plan');
       if (!hasSavedTomorrowPlan &&
           (_fieldControllers['tomorrow_plan']?.text.trim().isEmpty ?? false) &&
           pendingTasks.isNotEmpty) {
@@ -129,6 +131,9 @@ class _HomePageState extends State<HomePage> {
         _busy = false;
       });
       _attachDraftAutosave();
+      if (!identical(preparedDraft, draft)) {
+        await _saveDraftQuietly();
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) {
           return;

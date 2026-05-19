@@ -8,7 +8,31 @@ class ReportService {
     ReportTemplateItem(title: '2、明日工作计划', key: 'tomorrow_plan'),
   ];
 
-  String logicalToday([DateTime? now]) => DateFormat('yyyy-MM-dd').format(now ?? DateTime.now());
+  String logicalToday([DateTime? now]) =>
+      DateFormat('yyyy-MM-dd').format(now ?? DateTime.now());
+
+  Map<String, String> rollDraftToTodayIfNeeded(
+    Map<String, String> draft, {
+    DateTime? now,
+  }) {
+    final draftDate = draft['date']?.trim() ?? '';
+    if (draftDate.isEmpty) {
+      return draft;
+    }
+    final today = logicalToday(now);
+    final draftDay = DateTime.tryParse(draftDate);
+    final todayDay = DateTime.tryParse(today);
+    if (draftDay == null || todayDay == null || !draftDay.isBefore(todayDay)) {
+      return draft;
+    }
+    return {
+      'user': draft['user'] ?? '',
+      'department': draft['department'] ?? '',
+      'date': today,
+      if ((draft['field_tomorrow_plan']?.trim().isNotEmpty ?? false))
+        'field_today_work': draft['field_tomorrow_plan']!,
+    };
+  }
 
   String excelLetters(int index) {
     var n = index;
@@ -46,7 +70,8 @@ class ReportService {
         .map((line) => line.trim())
         .where((line) => line.isNotEmpty)
         .toList();
-    return [for (var i = 0; i < lines.length; i++) properBullet(lines[i], i)].join('\n');
+    return [for (var i = 0; i < lines.length; i++) properBullet(lines[i], i)]
+        .join('\n');
   }
 
   String cleanSuggestedSection(String text) {
@@ -55,7 +80,8 @@ class ReportService {
         .replaceFirst(RegExp(r'^[：:；;，,\s]+'), '')
         .split('\n')
         .map((line) => line.trim())
-        .where((line) => line.isNotEmpty && !RegExp(r'^[：:；;，,]+$').hasMatch(line))
+        .where(
+            (line) => line.isNotEmpty && !RegExp(r'^[：:；;，,]+$').hasMatch(line))
         .join('\n')
         .trim();
     return cleaned.replaceFirst(RegExp(r'^[：:；;，,\s]+'), '');
@@ -82,7 +108,9 @@ class ReportService {
         value = lastTomorrow;
       }
       if (item.key == 'today_work' || item.key == 'tomorrow_plan') {
-        value = value.isEmpty && item.key == 'tomorrow_plan' ? 'a. 休息' : formatWithBullets(value);
+        value = value.isEmpty && item.key == 'tomorrow_plan'
+            ? 'a. 休息'
+            : formatWithBullets(value);
       }
       storedFields[item.key] = value;
       output.add('${item.title}：\n$value\n');
@@ -90,20 +118,34 @@ class ReportService {
 
     final header = '姓名：$user  部门：$department  汇报日期：$date\n';
     final report = '$header${''.padRight(52, '=')}\n${output.join()}';
-    return ReportRecord(user: user, department: department, date: date, fields: storedFields, report: report);
+    return ReportRecord(
+        user: user,
+        department: department,
+        date: date,
+        fields: storedFields,
+        report: report);
   }
 
   Map<String, String>? parseTaskInput(String input) {
-    final match = RegExp(r'^(.*?)\s*[（(]([^）)]*)[）)]$').firstMatch(input.trim());
+    final match =
+        RegExp(r'^(.*?)\s*[（(]([^）)]*)[）)]$').firstMatch(input.trim());
     if (match == null) {
       return null;
     }
-    final parts = match.group(2)!.split(RegExp(r'[,，]')).map((part) => part.trim()).where((part) => part.isNotEmpty).toList();
+    final parts = match
+        .group(2)!
+        .split(RegExp(r'[,，]'))
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
     if (parts.length < 2) {
       return null;
     }
     return {
-      'name': match.group(1)!.replaceFirst(RegExp(r'^[a-zA-Z]{1,2}\.\s*'), '').trim(),
+      'name': match
+          .group(1)!
+          .replaceFirst(RegExp(r'^[a-zA-Z]{1,2}\.\s*'), '')
+          .trim(),
       'progress': parts[0],
       'completed': parts[1],
       'planned': parts.length >= 3 ? parts.sublist(2).join('，') : '',
@@ -125,5 +167,6 @@ class ReportService {
     return advice.join('\n');
   }
 
-  String _safeTokenPart(String value) => value.trim().replaceAll(RegExp(r'[\\/:*?"<>|\s]+'), '_');
+  String _safeTokenPart(String value) =>
+      value.trim().replaceAll(RegExp(r'[\\/:*?"<>|\s]+'), '_');
 }

@@ -70,6 +70,36 @@ void main() {
       expect(record.report, contains('a. 完成接口'));
       expect(record.report, contains('a. 继续测试'));
     });
+
+    test('rolls older draft tomorrow plan into today work', () {
+      final rolled = service.rollDraftToTodayIfNeeded(
+        {
+          'user': '张三',
+          'department': '研发部',
+          'date': '2026-05-18',
+          'field_today_work': 'a. 完成 A',
+          'field_tomorrow_plan': 'a. 完成 C\nb. 完成 D',
+        },
+        now: DateTime(2026, 5, 19),
+      );
+
+      expect(rolled['date'], '2026-05-19');
+      expect(rolled['field_today_work'], 'a. 完成 C\nb. 完成 D');
+      expect(rolled.containsKey('field_tomorrow_plan'), isFalse);
+    });
+
+    test('keeps same-day draft unchanged', () {
+      final draft = {
+        'date': '2026-05-19',
+        'field_today_work': 'a. 继续编辑',
+        'field_tomorrow_plan': 'a. 明天继续',
+      };
+
+      final rolled =
+          service.rollDraftToTodayIfNeeded(draft, now: DateTime(2026, 5, 19));
+
+      expect(identical(rolled, draft), isTrue);
+    });
   });
 
   group('StorageService', () {
