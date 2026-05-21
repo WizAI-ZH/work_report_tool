@@ -85,7 +85,7 @@ void main() {
 
       expect(rolled['date'], '2026-05-19');
       expect(rolled['field_today_work'], 'a. 完成 C\nb. 完成 D');
-      expect(rolled.containsKey('field_tomorrow_plan'), isFalse);
+      expect(rolled['field_tomorrow_plan'], '');
     });
 
     test('keeps same-day draft unchanged', () {

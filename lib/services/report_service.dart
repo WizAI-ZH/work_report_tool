@@ -31,6 +31,7 @@ class ReportService {
       'date': today,
       if ((draft['field_tomorrow_plan']?.trim().isNotEmpty ?? false))
         'field_today_work': draft['field_tomorrow_plan']!,
+      'field_tomorrow_plan': '',
     };
   }
 
