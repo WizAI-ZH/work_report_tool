@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:work_report_generator/models/report_models.dart';
 import 'package:work_report_generator/services/ai_service.dart';
 import 'package:work_report_generator/services/report_service.dart';
@@ -262,6 +265,88 @@ void main() {
       );
 
       expect(suggestion, contains('建议'));
+    });
+
+    test('builds strict formatting prompt and uses low temperature', () async {
+      late Map<String, dynamic> body;
+      final ai = AiService(
+        client: MockClient((request) async {
+          body = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'content': '1、今日工作完成情况：\na. 完成接口（100%，完成接口联调）\n\n2、明日工作计划：'
+                  }
+                }
+              ]
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }),
+      );
+
+      await ai.suggest(
+        config: const AiConfig(
+          apiKey: 'test-key',
+          apiUrl: 'https://api.example.com/v1/chat/completions',
+          model: 'test-model',
+          availableModels: ['test-model'],
+        ),
+        todayContent: '完成接口（100%，完成接口联调）',
+        tomorrowContent: '',
+        reportDate: '2026-05-22',
+        tomorrowMayBeRestDay: false,
+        userFeedback: '不要生成无关明日计划',
+      );
+
+      expect(body['temperature'], 0.2);
+      final messages = body['messages'] as List;
+      final prompt = (messages.last as Map)['content'] as String;
+      expect(prompt, contains('只能输出最终汇报正文'));
+      expect(prompt, contains('不得编造任务、模块、客户、风险、进度、数字、成果或原因'));
+      expect(prompt, contains('标题下保持空白'));
+      expect(prompt, contains('不要生成无关明日计划'));
+    });
+
+    test('cleans markdown and preface from ai response', () async {
+      final ai = AiService(
+        client: MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'content':
+                        '好的，整理如下：\n```text\n1、今日工作完成情况：\na. 测试（100%，完成回归测试）\n\n2、明日工作计划：\n```'
+                  }
+                }
+              ]
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }),
+      );
+
+      final suggestion = await ai.suggest(
+        config: const AiConfig(
+          apiKey: 'test-key',
+          apiUrl: 'https://api.example.com/v1/chat/completions',
+          model: 'test-model',
+          availableModels: ['test-model'],
+        ),
+        todayContent: '测试（100%，完成回归测试）',
+        tomorrowContent: '',
+        reportDate: '2026-05-22',
+        tomorrowMayBeRestDay: false,
+      );
+
+      expect(suggestion.startsWith('1、今日工作完成情况：'), isTrue);
+      expect(suggestion, isNot(contains('```')));
+      expect(suggestion, isNot(contains('好的')));
     });
   });
 
