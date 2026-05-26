@@ -1,7 +1,7 @@
 name: work_report_generator
 description: Cross-platform work report generator for Windows, macOS, and Android.
 publish_to: "none"
-version: 1.2.3+18
+version: 1.2.4+19
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -40,5 +40,5 @@ msix_config:
   display_name: 威智工作汇报器
   publisher_display_name: Wiz
   identity_name: WizWorkReportGenerator
-  msix_version: 1.2.3.0
+  msix_version: 1.2.4.0
   logo_path: wiz_work_repo_tool_logo.png

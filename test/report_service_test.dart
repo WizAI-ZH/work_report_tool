@@ -295,7 +295,8 @@ void main() {
           model: 'test-model',
           availableModels: ['test-model'],
         ),
-        todayContent: '完成接口（100%，完成接口联调）',
+        todayContent: '横琴省赛研课对接（70%，目前聂总已跟研课方对接，预计6月初寄出最终版道具以正式启动研课）\n'
+            '技术支持（持续跟进中，已解决珠海、广州的问题）',
         tomorrowContent: '',
         reportDate: '2026-05-22',
         tomorrowMayBeRestDay: false,
@@ -307,7 +308,11 @@ void main() {
       final prompt = (messages.last as Map)['content'] as String;
       expect(prompt, contains('只能输出最终汇报正文'));
       expect(prompt, contains('不得编造任务、模块、客户、风险、进度、数字、成果或原因'));
-      expect(prompt, contains('标题下保持空白'));
+      expect(prompt, contains('所有未完成的项目性工作都要继续存在于明日计划'));
+      expect(prompt, contains('日常性或持续性工作也要进入明日计划'));
+      expect(prompt, contains('不用加进度预计'));
+      expect(prompt, contains('项目性工作”模板整理'));
+      expect(prompt, contains('横琴省赛研课对接'));
       expect(prompt, contains('不要生成无关明日计划'));
     });
 
