@@ -313,6 +313,10 @@ void main() {
       expect(prompt, contains('不用加进度预计'));
       expect(prompt, contains('项目性工作”模板整理'));
       expect(prompt, contains('横琴省赛研课对接'));
+      expect(prompt, contains('标准参考样例'));
+      expect(prompt, contains('交付进度表进度及预计完成日期填写（100%，已完成）'));
+      expect(prompt, contains('3D航天产品说明书编写（预计40%，开始正式编写）'));
+      expect(prompt, contains('严禁复制样例中的任务到最终结果'));
       expect(prompt, contains('不要生成无关明日计划'));
     });
 

@@ -20,7 +20,7 @@ import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.2.4';
+const _appVersion = '1.2.5';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
