@@ -20,7 +20,7 @@ import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.2.5';
+const _appVersion = '1.2.6';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -302,7 +302,7 @@ class _HomePageState extends State<HomePage> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           itemCount: _historyTokens.length,
@@ -317,23 +317,91 @@ class _HomePageState extends State<HomePage> {
                 if (!mounted || record == null) {
                   return;
                 }
-                _userController.text = record.user;
-                _deptController.text = record.department;
-                _dateController.text = record.date;
-                for (final entry in record.fields.entries) {
-                  _fieldControllers[entry.key]?.text = entry.value;
-                }
-                _outputController.text = record.report;
-                await _saveDraftQuietly();
-                if (!context.mounted) {
+                final shouldApply =
+                    await _showHistoryRecordPreview(token, record);
+                if (!mounted || shouldApply != true) {
                   return;
                 }
-                Navigator.of(context).pop();
-                _showSnack('历史记录已导入');
+                _applyHistoryRecord(record);
+                await _saveDraftQuietly();
+                if (!sheetContext.mounted) {
+                  return;
+                }
+                Navigator.of(sheetContext).pop();
+                _showSnack('历史记录已应用到当前编辑');
               },
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _applyHistoryRecord(ReportRecord record) {
+    _userController.text = record.user;
+    _deptController.text = record.department;
+    _dateController.text = record.date;
+    for (final entry in record.fields.entries) {
+      _fieldControllers[entry.key]?.text = entry.value;
+    }
+    _outputController.text = record.report;
+  }
+
+  Future<bool?> _showHistoryRecordPreview(
+      String token, ReportRecord record) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(token, maxLines: 1, overflow: TextOverflow.ellipsis),
+        content: SizedBox(
+          width: 640,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 520),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text(record.user)),
+                      Chip(label: Text(record.department)),
+                      Chip(label: Text(record.date)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    record.report.trim().isEmpty
+                        ? '这条历史记录没有保存汇报正文。'
+                        : record.report,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: record.report));
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext, false);
+              }
+              _showSnack('历史记录内容已复制');
+            },
+            child: const Text('复制内容'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('关闭'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('应用到当前编辑'),
+          ),
+        ],
       ),
     );
   }
