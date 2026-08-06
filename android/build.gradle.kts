@@ -1,7 +1,10 @@
+val useAliyun = System.getenv("USE_ALIYUN_MIRROR")?.trim()?.lowercase() != "false"
 allprojects {
     repositories {
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/central") }
+        if (useAliyun) {
+            maven { url = uri("https://maven.aliyun.com/repository/google") }
+            maven { url = uri("https://maven.aliyun.com/repository/central") }
+        }
         google()
         mavenCentral()
     }
