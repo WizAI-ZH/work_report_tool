@@ -39,6 +39,7 @@ flutter:
 msix_config:
   display_name: 威智工作汇报器
   publisher_display_name: Wiz
+  publisher: CN=Wiz
   identity_name: WizWorkReportGenerator
   msix_version: 1.2.21.0
   logo_path: wiz_work_repo_tool_logo.png
