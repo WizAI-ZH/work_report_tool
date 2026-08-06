@@ -160,6 +160,18 @@ class StorageService {
     _writeJson('report_config', config);
   }
 
+  Future<String> loadWechatTarget() async {
+    final config = _readReportConfig();
+    final target = config['wechat_target']?.toString().trim() ?? '';
+    return target.isEmpty ? '文件传输助手' : target;
+  }
+
+  Future<void> saveWechatTarget(String groupName) async {
+    final config = _readReportConfig();
+    config['wechat_target'] = groupName.trim();
+    _writeJson('report_config', config);
+  }
+
   Map<String, dynamic> _readReportConfig() {
     final decoded = _readJson('report_config');
     if (decoded is Map) {

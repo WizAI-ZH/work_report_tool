@@ -224,6 +224,20 @@ class StorageService {
         .writeAsString(const JsonEncoder.withIndent('  ').convert(config));
   }
 
+  Future<String> loadWechatTarget() async {
+    final config = await _loadReportConfig();
+    final target = config['wechat_target']?.toString().trim() ?? '';
+    return target.isEmpty ? '文件传输助手' : target;
+  }
+
+  Future<void> saveWechatTarget(String groupName) async {
+    final config = await _loadReportConfig();
+    config['wechat_target'] = groupName.trim();
+    final file = await _file('report_config.json');
+    await file
+        .writeAsString(const JsonEncoder.withIndent('  ').convert(config));
+  }
+
   Future<Map<String, dynamic>> _loadReportConfig() async {
     final file = await _file('report_config.json');
     if (!await file.exists()) {

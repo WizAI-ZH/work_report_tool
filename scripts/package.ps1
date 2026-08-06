@@ -41,6 +41,17 @@ function Ensure-PlatformPermissions {
 
 function Build-Windows {
   flutter build windows --release
+  # 打包企微发送助手为独立 exe（含 OCR 模型等所有 Python 依赖），
+  # 用户的机器不需要安装 Python。产物复制到 Release/scripts/ 下，
+  # NSIS 安装包会自动包含。
+  $HelperScript = Join-Path $PSScriptRoot "build_wework_helper.ps1"
+  if (Test-Path $HelperScript) {
+    Write-Host "Building send_to_wework.exe (standalone, no Python required)..."
+    & $HelperScript
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "send_to_wework.exe 打包失败，Windows 安装包将不含企微自动发送功能"
+    }
+  }
   flutter pub run msix:create
 }
 

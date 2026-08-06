@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -20,10 +21,37 @@ import 'services/wechat_service.dart';
 
 const _freeApiKeyUrl = 'https://github.com/chatanywhere/GPT_API_free';
 const _appName = '威智工作汇报器';
-const _appVersion = '1.2.6';
+const _appVersion = '1.2.21';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // 把 Flutter 默认的红屏错误改成可读的灰色提示，避免用户看到吓人的堆栈。
+  ErrorWidget.builder = (details) {
+    debugPrint('ErrorWidget: $details');
+    return Material(
+      color: const Color(0xfff5f5f5),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 12),
+              const Text('界面渲染出错了',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(
+                details.exception.toString(),
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
   runApp(const WorkReportApp());
 }
 
@@ -75,6 +103,7 @@ class _HomePageState extends State<HomePage> {
   var _template = ReportService.defaultTemplate;
   var _aiConfig = AiConfig.defaults;
   var _historyTokens = <String>[];
+  var _wechatTarget = '文件传输助手';
   var _busy = true;
   var _checkingUpdate = false;
   var _draftListenersAttached = false;
@@ -106,6 +135,7 @@ class _HomePageState extends State<HomePage> {
       final draft = await _storage.loadDraft();
       final history = await _storage.loadHistoryTokens();
       final pendingTasks = await _storage.loadPendingTasks();
+      final wechatTarget = await _storage.loadWechatTarget();
       for (final item in template) {
         _fieldControllers.putIfAbsent(item.key, () => TextEditingController());
       }
@@ -128,6 +158,7 @@ class _HomePageState extends State<HomePage> {
         _template = template;
         _aiConfig = aiConfig;
         _historyTokens = history;
+        _wechatTarget = wechatTarget;
         _busy = false;
       });
       _attachDraftAutosave();
@@ -293,9 +324,103 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _sendToWechat() async {
-    await _generateReport(copy: true);
-    final opened = await _wechat.openEnterpriseWechat();
-    _showSnack(opened ? '已复制内容并尝试打开企业微信' : '已复制内容，请手动打开企业微信粘贴');
+    await _generateReport(copy: false);
+    final report = _outputController.text.trim();
+    if (report.isEmpty) {
+      _showSnack('汇报内容为空，无法发送');
+      return;
+    }
+
+    // Android 首次使用需开启无障碍服务，否则无法自动操作企微。
+    if (Platform.isAndroid) {
+      final enabled = await _wechat.isAccessibilityEnabled();
+      if (!enabled) {
+        if (!mounted) return;
+        final agreed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('需要无障碍权限'),
+            content: const Text(
+                '自动发送到企业微信需要开启无障碍服务权限。点击"去开启"后，'
+                '在系统设置里找到"威智工作汇报器自动发送"并打开。'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('取消')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('去开启')),
+            ],
+          ),
+        );
+        if (agreed == true) {
+          await _wechat.openAccessibilitySettings();
+        }
+        _showSnack('开启无障碍权限后，再次点击"发送到企微"即可自动发送');
+        return;
+      }
+    }
+
+    final status = await _wechat.sendToEnterpriseWechatWithStatus(
+      message: report,
+      groupName: _wechatTarget,
+    );
+    switch (status) {
+      case 'sent':
+        _showSnack('已发送到企微“$_wechatTarget”');
+        break;
+      case 'no_accessibility':
+        _showSnack('未开启无障碍权限，请在系统设置中开启后重试');
+        break;
+      default:
+        // 把具体失败原因显示出来，方便定位（对应 WeWorkAccessibilityService 的状态码）
+        final reason = _explainSendStatus(status);
+        _showSnack('发送失败：$reason（内容已复制到剪贴板，可手动粘贴）');
+    }
+  }
+
+  /// 把无障碍服务返回的状态码翻译成用户可读的中文原因。
+  String _explainSendStatus(String status) {
+    switch (status) {
+      case 'timeout':
+        return '等待企微响应超时';
+      case 'no_home':
+        return '无法回到企微主界面';
+      case 'no_wework':
+        return '未找到企业微信';
+      case 'no_search_entry':
+        return '找不到搜索入口';
+      case 'no_search_box':
+        return '点击搜索后未出现搜索输入框';
+      case 'no_group_result':
+        return '搜索结果中找不到目标群“$_wechatTarget”';
+      case 'no_input_box':
+        return '进入群聊后找不到消息输入框';
+      case 'no_chat_page':
+        return '点击搜索结果后未进入群聊页面';
+      case 'no_send_button':
+        return '找不到发送按钮';
+      case 'failed':
+        return '未知错误';
+      default:
+        return status.startsWith('error:') ? '程序异常：${status.substring(6)}' : status;
+    }
+  }
+
+  Future<void> _configureWechatTarget() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => _WechatTargetDialog(initial: _wechatTarget),
+    );
+    if (result == null) {
+      return;
+    }
+    await _storage.saveWechatTarget(result);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _wechatTarget = result);
+    _showSnack('企微发送群已保存');
   }
 
   Future<void> _showHistory() async {
@@ -1158,6 +1283,10 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.settings_suggest_outlined),
             label: const Text('AI')),
         TextButton.icon(
+            onPressed: _configureWechatTarget,
+            icon: const Icon(Icons.forum_outlined),
+            label: const Text('企微')),
+        TextButton.icon(
             onPressed: _showSyncTools,
             icon: const Icon(Icons.sync),
             label: const Text('同步')),
@@ -1240,6 +1369,14 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const PopupMenuItem(
+          value: _TopBarMenuAction.wechat,
+          child: ListTile(
+            leading: Icon(Icons.forum_outlined),
+            title: Text('企微'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
           value: _TopBarMenuAction.sync,
           child: ListTile(
             leading: Icon(Icons.sync),
@@ -1269,6 +1406,8 @@ class _HomePageState extends State<HomePage> {
     switch (selected) {
       case _TopBarMenuAction.ai:
         _configureAi();
+      case _TopBarMenuAction.wechat:
+        _configureWechatTarget();
       case _TopBarMenuAction.sync:
         _showSyncTools();
       case _TopBarMenuAction.template:
@@ -1281,7 +1420,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-enum _TopBarMenuAction { ai, sync, template, history }
+enum _TopBarMenuAction { ai, wechat, sync, template, history }
 
 class _UpdateInstallProgress {
   const _UpdateInstallProgress(this.progress, this.message);
@@ -1760,6 +1899,22 @@ class _AiSuggestionDialogState extends State<_AiSuggestionDialog> {
   final _feedbackController = TextEditingController();
   var _regenerating = false;
 
+  // 常用重新生成建议：基于历史记录中反复出现的 AI 稳定性问题。
+  static const _commonSuggestions = [
+    '明日工作计划需要补充预计进度',
+    '今日工作进度不要写“预计”',
+    '100%完成的任务不要出现在明日计划',
+    '删除末尾省略号',
+    '明日计划写得更具体',
+    '休息日明日计划只写“休息”',
+  ];
+
+  void _useSuggestion(String text) {
+    _feedbackController.text = text;
+    _feedbackController.selection =
+        TextSelection.collapsed(offset: text.length);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1832,6 +1987,21 @@ class _AiSuggestionDialogState extends State<_AiSuggestionDialog> {
                 decoration: const InputDecoration(
                   hintText: '不满意时再填，例如：明日计划更具体；不要使用“推进”这类词',
                   border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final suggestion in _commonSuggestions)
+                      ActionChip(
+                        label: Text(suggestion),
+                        onPressed: () => _useSuggestion(suggestion),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -1917,35 +2087,468 @@ class _HeaderFields extends StatelessWidget {
   }
 }
 
-class _InputFields extends StatelessWidget {
+class _InputFields extends StatefulWidget {
   const _InputFields({required this.template, required this.controllers});
 
   final List<ReportTemplateItem> template;
   final Map<String, TextEditingController> controllers;
 
   @override
+  State<_InputFields> createState() => _InputFieldsState();
+}
+
+class _InputFieldsState extends State<_InputFields> {
+  var _templateMode = false;
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('工作内容填写区', style: Theme.of(context).textTheme.titleMedium),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('工作内容填写区',
+                style: Theme.of(context).textTheme.titleMedium),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('自由文本')),
+                ButtonSegment(value: true, label: Text('模板填写')),
+              ],
+              selected: {_templateMode},
+              onSelectionChanged: (value) =>
+                  setState(() => _templateMode = value.first),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
-        for (final item in template) ...[
-          TextField(
-            controller: controllers[item.key],
-            minLines: 5,
-            maxLines: 8,
-            textInputAction: TextInputAction.newline,
-            decoration: InputDecoration(
-                labelText: item.title,
-                alignLabelWithHint: true,
-                border: const OutlineInputBorder()),
-          ),
+        for (final item in widget.template) ...[
+          if (_templateMode)
+            _TemplateFieldEditor(
+              title: item.title,
+              controller: widget.controllers[item.key]!,
+            )
+          else
+            TextField(
+              controller: widget.controllers[item.key],
+              minLines: 5,
+              maxLines: 8,
+              textInputAction: TextInputAction.newline,
+              decoration: InputDecoration(
+                  labelText: item.title,
+                  alignLabelWithHint: true,
+                  border: const OutlineInputBorder()),
+            ),
           const SizedBox(height: 12),
         ],
       ],
     );
   }
+}
+
+/// 模板填写编辑器：把一个大区拆成多行，每行固定 4 列
+/// （任务名、进度、当前工作节点、预期工作）。空列序列化时跳过，
+/// 不生成对应的括号内容，例如已完成的任务空掉“预期工作”会生成“任务名（进度，当前节点）”。
+class _TemplateFieldEditor extends StatefulWidget {
+  const _TemplateFieldEditor({required this.title, required this.controller});
+
+  final String title;
+  final TextEditingController controller;
+
+  @override
+  State<_TemplateFieldEditor> createState() => _TemplateFieldEditorState();
+}
+
+class _TemplateFieldEditorState extends State<_TemplateFieldEditor> {
+  late final List<_TaskRowControllers> _rows;
+
+  @override
+  void initState() {
+    super.initState();
+    final parsed = _parseTemplateRows(widget.controller.text);
+    _rows = parsed.isEmpty
+        ? [_TaskRowControllers.empty()]
+        : parsed.map(_TaskRowControllers.fromRow).toList();
+    for (final row in _rows) {
+      row.addListener(_syncToController);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final row in _rows) {
+      row.removeListener(_syncToController);
+      row.dispose();
+    }
+    super.dispose();
+  }
+
+  void _syncToController() {
+    final serialized = _serializeTemplateRows(
+        _rows.map((row) => row.toRow()).toList());
+    if (serialized != widget.controller.text) {
+      widget.controller.text = serialized;
+    }
+  }
+
+  void _addRow() {
+    setState(() {
+      final row = _TaskRowControllers.empty();
+      row.addListener(_syncToController);
+      _rows.add(row);
+    });
+  }
+
+  void _removeRow(int index) {
+    if (_rows.length <= 1) {
+      // 只剩一行时清空内容，保留一个空行供继续填写。
+      setState(() => _rows.first.clear());
+      _syncToController();
+      return;
+    }
+    setState(() {
+      final removed = _rows.removeAt(index);
+      removed.removeListener(_syncToController);
+      removed.dispose();
+    });
+    _syncToController();
+  }
+
+  /// 构造一行 4 列 TextField + 删除按钮。
+  /// [stacked]=true 时纵向堆叠（窄屏），=false 时横向 Row（宽屏，每列用 Expanded）。
+  List<Widget> _rowChildren(int i, {required bool stacked}) {
+    final gap = stacked ? 6.0 : 6.0;
+    final fields = <Widget>[
+      TextField(
+        controller: _rows[i].name,
+        textInputAction: TextInputAction.next,
+        onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+        decoration: const InputDecoration(
+          labelText: '任务名',
+          isDense: true,
+          border: OutlineInputBorder(),
+        ),
+      ),
+      TextField(
+        controller: _rows[i].progress,
+        textInputAction: TextInputAction.next,
+        onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+        decoration: const InputDecoration(
+          labelText: '进度',
+          hintText: '65%/预计80%',
+          isDense: true,
+          border: OutlineInputBorder(),
+        ),
+      ),
+      TextField(
+        controller: _rows[i].current,
+        textInputAction: TextInputAction.next,
+        onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+        decoration: const InputDecoration(
+          labelText: '当前工作节点',
+          isDense: true,
+          border: OutlineInputBorder(),
+        ),
+      ),
+      TextField(
+        controller: _rows[i].planned,
+        textInputAction: TextInputAction.next,
+        onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+        decoration: const InputDecoration(
+          labelText: '预期工作',
+          isDense: true,
+          border: OutlineInputBorder(),
+        ),
+      ),
+    ];
+    // 删除按钮：横排用紧凑 IconButton，纵排用对齐右下的 TextButton。
+    final deleteBtn = stacked
+        ? Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _removeRow(i),
+              icon: const Icon(Icons.remove_circle_outline, size: 18),
+              label: const Text('删除该行'),
+            ),
+          )
+        : IconButton(
+            tooltip: '删除该行',
+            icon: const Icon(Icons.remove_circle_outline),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => _removeRow(i),
+          );
+
+    if (stacked) {
+      final result = <Widget>[];
+      for (var j = 0; j < fields.length; j++) {
+        result.add(fields[j]);
+        if (j < fields.length - 1) result.add(SizedBox(height: gap));
+      }
+      result.add(SizedBox(height: gap));
+      result.add(deleteBtn);
+      return result;
+    }
+    // 横排：用 flex 控制列宽 3:1:3:3
+    final flexes = [3, 1, 3, 3];
+    final result = <Widget>[];
+    for (var j = 0; j < fields.length; j++) {
+      result.add(Expanded(flex: flexes[j], child: fields[j]));
+      if (j < fields.length - 1) result.add(SizedBox(width: gap));
+    }
+    result.add(const SizedBox(width: 4));
+    result.add(deleteBtn);
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 6),
+        for (var i = 0; i < _rows.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            // 窄屏（手机）一行 4 列 + 删除按钮会溢出，改用 LayoutBuilder 自适应：
+            // 宽度足够时一行横排，不够时纵向堆叠每列。
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // 4 个 TextField + 间距 + 删除按钮，窄屏横排会溢出。
+                // 阈值 1100：手机竖屏（~1216）走横排但用紧凑布局；
+                // 更窄（分屏/小屏）走纵向堆叠。
+                final wide = constraints.maxWidth >= 1100;
+                if (wide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _rowChildren(i, stacked: false),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _rowChildren(i, stacked: true),
+                );
+              },
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _addRow,
+            icon: const Icon(Icons.add),
+            label: const Text('新建行'),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '空列不会生成对应内容。例如已完成的任务可空掉“预期工作”，生成“任务名（进度，当前节点）”。Tab 键可在列间快速切换。',
+          style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor),
+        ),
+      ],
+    );
+  }
+}
+
+/// 企微发送群设置对话框。用独立 StatefulWidget 管理 controller 生命周期，
+/// 避免 controller 在 dialog 关闭后被外部 dispose 导致 rebuild 报错。
+class _WechatTargetDialog extends StatefulWidget {
+  const _WechatTargetDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_WechatTargetDialog> createState() => _WechatTargetDialogState();
+}
+
+class _WechatTargetDialogState extends State<_WechatTargetDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('企微发送设置'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('点击“发送到企微”时，自动打开企业微信并搜索以下群名：'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              decoration: const InputDecoration(
+                labelText: '群名',
+                hintText: '默认：文件传输助手',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+                '留空使用“文件传输助手”。搜索进入群后，汇报内容已复制到剪贴板，直接 Ctrl+V 粘贴即可。',
+                style: TextStyle(fontSize: 12)),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消')),
+        FilledButton(
+          onPressed: () {
+            final value = _controller.text.trim();
+            Navigator.pop(context, value.isEmpty ? '文件传输助手' : value);
+          },
+          child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskRow {
+  const _TaskRow({
+    this.name = '',
+    this.progress = '',
+    this.current = '',
+    this.planned = '',
+  });
+
+  final String name;
+  final String progress;
+  final String current;
+  final String planned;
+}
+
+class _TaskRowControllers {
+  _TaskRowControllers._(
+      this.name, this.progress, this.current, this.planned);
+
+  factory _TaskRowControllers.empty() => _TaskRowControllers._(
+        TextEditingController(),
+        TextEditingController(),
+        TextEditingController(),
+        TextEditingController(),
+      );
+
+  factory _TaskRowControllers.fromRow(_TaskRow row) => _TaskRowControllers._(
+        TextEditingController(text: row.name),
+        TextEditingController(text: row.progress),
+        TextEditingController(text: row.current),
+        TextEditingController(text: row.planned),
+      );
+
+  final TextEditingController name;
+  final TextEditingController progress;
+  final TextEditingController current;
+  final TextEditingController planned;
+
+  void addListener(VoidCallback callback) {
+    name.addListener(callback);
+    progress.addListener(callback);
+    current.addListener(callback);
+    planned.addListener(callback);
+  }
+
+  void removeListener(VoidCallback callback) {
+    name.removeListener(callback);
+    progress.removeListener(callback);
+    current.removeListener(callback);
+    planned.removeListener(callback);
+  }
+
+  void clear() {
+    name.clear();
+    progress.clear();
+    current.clear();
+    planned.clear();
+  }
+
+  void dispose() {
+    name.dispose();
+    progress.dispose();
+    current.dispose();
+    planned.dispose();
+  }
+
+  _TaskRow toRow() => _TaskRow(
+        name: name.text,
+        progress: progress.text,
+        current: current.text,
+        planned: planned.text,
+      );
+}
+
+/// 解析多行文本为模板行。每行格式“任务名（进度，当前节点，预期工作）”或纯任务名。
+List<_TaskRow> _parseTemplateRows(String text) {
+  final rows = <_TaskRow>[];
+  for (final rawLine in text.split('\n')) {
+    final line = rawLine.trim();
+    if (line.isEmpty) {
+      continue;
+    }
+    final withoutBullet = line
+        .replaceFirst(RegExp(r'^[a-zA-Z]{1,2}\.\s*'), '')
+        .replaceFirst(RegExp(r'^\d+[、.]\s*'), '');
+    final match =
+        RegExp(r'^(.*?)\s*[（(]([^）)]*)[）)]\s*$').firstMatch(withoutBullet);
+    if (match != null) {
+      final name = match.group(1)!.trim();
+      final parts = match
+          .group(2)!
+          .split(RegExp(r'[,，]'))
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .toList();
+      rows.add(_TaskRow(
+        name: name,
+        progress: parts.isNotEmpty ? parts[0] : '',
+        current: parts.length > 1 ? parts[1] : '',
+        planned: parts.length > 2 ? parts.sublist(2).join('，') : '',
+      ));
+    } else {
+      rows.add(_TaskRow(name: withoutBullet));
+    }
+  }
+  return rows;
+}
+
+/// 把模板行序列化为多行文本。空列跳过；任务名为空的整行跳过。
+String _serializeTemplateRows(List<_TaskRow> rows) {
+  final lines = <String>[];
+  for (final row in rows) {
+    final name = row.name.trim();
+    if (name.isEmpty) {
+      continue;
+    }
+    final parts = <String>[
+      if (row.progress.trim().isNotEmpty) row.progress.trim(),
+      if (row.current.trim().isNotEmpty) row.current.trim(),
+      if (row.planned.trim().isNotEmpty) row.planned.trim(),
+    ];
+    if (parts.isEmpty) {
+      lines.add(name);
+    } else {
+      lines.add('$name（${parts.join('，')}）');
+    }
+  }
+  return lines.join('\n');
 }
 
 class _OutputField extends StatelessWidget {

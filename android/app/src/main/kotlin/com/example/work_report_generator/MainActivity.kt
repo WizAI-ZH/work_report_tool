@@ -1,9 +1,11 @@
 package com.example.work_report_generator
 
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.text.TextUtils
 import androidx.core.content.FileProvider
 import java.io.File
 import io.flutter.embedding.android.FlutterActivity
@@ -17,6 +19,16 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "openEnterpriseWechat" -> result.success(openEnterpriseWechat())
+                    "sendToEnterpriseWechat" -> {
+                        val message = call.argument<String>("message") ?: ""
+                        val groupName = call.argument<String>("groupName") ?: "文件传输助手"
+                        result.success(sendToEnterpriseWechat(message, groupName))
+                    }
+                    "isAccessibilityEnabled" -> result.success(isAccessibilityEnabled())
+                    "openAccessibilitySettings" -> {
+                        openAccessibilitySettings()
+                        result.success(true)
+                    }
                     "getSupportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
                     "installApk" -> {
                         val path = call.argument<String>("path")
@@ -38,6 +50,46 @@ class MainActivity : FlutterActivity() {
             }
         }
         return false
+    }
+
+    /**
+     * 一键发送到企业微信。无障碍服务未启用时返回 "no_accessibility"，
+     * Flutter 端据此引导用户去系统设置授权。
+     */
+    private fun sendToEnterpriseWechat(message: String, groupName: String): String {
+        if (!isAccessibilityEnabled()) {
+            return "no_accessibility"
+        }
+        // 先把企微拉到前台，无障碍服务才能操作它的控件树。
+        if (!openEnterpriseWechat()) {
+            return "no_wework"
+        }
+        Thread.sleep(1500)
+        return WeWorkAccessibilityService.startSend(message, groupName)
+    }
+
+    private fun isAccessibilityEnabled(): Boolean {
+        if (WeWorkAccessibilityService.isEnabled()) return true
+        val expectedComponent = ComponentName(this, WeWorkAccessibilityService::class.java)
+        val enabledServices = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        val colonSplit = TextUtils.SimpleStringSplitter(':').apply { setString(enabledServices) }
+        while (colonSplit.hasNext()) {
+            val component = colonSplit.next()
+            if (component.equals(expectedComponent.flattenToString(), ignoreCase = true)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun openAccessibilitySettings() {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
     }
 
     private fun installApk(path: String?): String {

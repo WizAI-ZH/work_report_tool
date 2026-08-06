@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">威智工作汇报器自动发送到企业微信：自动搜索群、粘贴汇报内容并发送。仅在点击"发送到企微"时工作，不会读取其他内容。</string>
+</resources>
