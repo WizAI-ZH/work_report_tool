@@ -79,7 +79,15 @@ jobs:
       - name: Create dmg
         run: |
           mkdir -p dist
-          hdiutil create -volname WorkReportGenerator -srcfolder build/macos/Build/Products/Release/work_report_generator.app -ov -format UDZO dist/WorkReportGenerator_macos.dmg
+          # Flutter 输出的 .app 名称可能因版本不同而变化，先查找实际路径
+          APP_PATH=$(find build/macos/Build/Products/Release -maxdepth 1 -name "*.app" | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found in build/macos/Build/Products/Release/"
+            ls -la build/macos/Build/Products/Release/ || true
+            exit 1
+          fi
+          echo "Found app: $APP_PATH"
+          hdiutil create -volname WorkReportGenerator -srcfolder "$APP_PATH" -ov -format UDZO dist/WorkReportGenerator_macos.dmg
       - uses: actions/upload-artifact@v4
         with:
           name: WorkReportGenerator_macos
