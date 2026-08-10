@@ -75,20 +75,33 @@ class UpdateService {
   Future<Map<String, dynamic>?> _preferredAsset(
       List<Map<String, dynamic>> assets) async {
     final androidAbiSuffixes = await _androidAbiAssetSuffixes();
-    final preferredSuffixes = <String>[
+    // 产物命名格式：WorkReportGenerator_<platform>_<version>.<ext>
+    // 版本号插在平台关键词和扩展名之间，纯 endsWith('_windows.zip') 匹配不到
+    // WorkReportGenerator_windows_1.2.21.zip，因此用 contains + endsWith 组合。
+    final rules = <({String keyword, String suffix})>[
       if (Platform.isAndroid) ...[
-        ...androidAbiSuffixes,
-        '_android.apk',
-        '.apk',
+        for (final s in androidAbiSuffixes)
+          (keyword: 'android', suffix: s),
+        (keyword: 'android', suffix: '.apk'),
+        (keyword: '', suffix: '.apk'),
       ],
-      if (Platform.isWindows) ...['_windows_setup.exe', '.exe', '_windows.zip'],
-      if (Platform.isMacOS) ...['.dmg', '.pkg'],
+      if (Platform.isWindows) ...[
+        (keyword: 'windows', suffix: '.exe'),
+        (keyword: 'windows', suffix: '.zip'),
+        (keyword: 'windows', suffix: '.msix'),
+      ],
+      if (Platform.isMacOS) ...[
+        (keyword: 'macos', suffix: '.dmg'),
+        (keyword: 'macos', suffix: '.pkg'),
+        (keyword: '', suffix: '.dmg'),
+      ],
     ];
 
-    for (final suffix in preferredSuffixes) {
+    for (final rule in rules) {
       for (final asset in assets) {
         final name = (asset['name'] as String? ?? '').toLowerCase();
-        if (name.endsWith(suffix)) {
+        if (name.endsWith(rule.suffix) &&
+            (rule.keyword.isEmpty || name.contains(rule.keyword))) {
           return asset;
         }
       }

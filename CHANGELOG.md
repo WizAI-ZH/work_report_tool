@@ -2,6 +2,13 @@
 
 本文档记录"威智工作汇报器"的版本更新内容。发布脚本会读取对应版本的小节，并同步写入 GitHub Release 描述。
 
+## [1.2.22] - 2026-08-06
+
+### 修复
+
+- 修复应用内更新功能报错"发现新版本，但没有找到当前平台可用的安装包"：`UpdateService._preferredAsset` 原用 `endsWith('_windows.zip')` 匹配，但实际文件名格式为 `WorkReportGenerator_windows_1.2.21.zip`（版本号在中间），导致匹配失败。改用 `contains` + `endsWith` 组合匹配，同时 Windows 新增 `.msix` 格式支持。
+- CI Release 产物 Windows zip 命名改为 `WorkReportGenerator_<版本>_windows.zip`，兼容旧版本应用的 `endsWith('_windows.zip')` 匹配逻辑，确保旧版本用户也能正常自动更新。
+
 ## [1.2.21] - 2026-08-06
 
 ### 新增

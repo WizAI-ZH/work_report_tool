@@ -119,13 +119,14 @@ jobs:
           mv artifacts/WorkReportGenerator_macos/WorkReportGenerator_macos.dmg \
              release/WorkReportGenerator_macos_${{ steps.ver.outputs.version }}.dmg
           # Windows 产物是散文件，打包成 zip
+          # 文件名用 _windows.zip 结尾，兼容旧版本应用的 endsWith('_windows.zip') 匹配
           cd artifacts/WorkReportGenerator_windows
-          zip -r "../../release/WorkReportGenerator_windows_${{ steps.ver.outputs.version }}.zip" .
+          zip -r "../../release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows.zip" .
           cd ../..
           # 同时附带 msix（如果存在）
           if [ -f artifacts/WorkReportGenerator_windows/*.msix ]; then
             mv artifacts/WorkReportGenerator_windows/*.msix \
-               release/WorkReportGenerator_windows_${{ steps.ver.outputs.version }}.msix
+               release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows.msix
           fi
       - name: Extract changelog section for this version
         id: notes
