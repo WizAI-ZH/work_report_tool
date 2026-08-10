@@ -64,9 +64,9 @@ jobs:
         shell: pwsh
         run: |
           $Version = (Select-String -Path pubspec.yaml -Pattern '^version:' | Select-Object -First 1).Line -replace 'version:\s*','' -replace '\+.*',''
-          $SourceDir = "build\windows\x64\runner\Release"
-          $IconPath = "windows\runner\resources\app_icon.ico"
-          $OutFile = "dist\WorkReportGenerator_windows_setup.exe"
+          $SourceDir = (Resolve-Path "build\windows\x64\runner\Release").Path
+          $IconPath = (Resolve-Path "windows\runner\resources\app_icon.ico").Path
+          $OutFile = (Join-Path (Get-Location).Path "dist\WorkReportGenerator_windows_setup.exe")
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $MakeNSIS = Get-Command makensis -ErrorAction SilentlyContinue
           if (-not $MakeNSIS) {
