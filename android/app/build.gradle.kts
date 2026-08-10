@@ -37,16 +37,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-
-    // 按 ABI 拆分 APK，减小体积（fat APK ~53MB → 单 ABI ~20MB）
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = false
-        }
-    }
 }
 
 flutter {

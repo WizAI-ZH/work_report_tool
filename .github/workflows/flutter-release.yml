@@ -36,8 +36,8 @@ jobs:
             perl -0pi -e 's/<manifest([^>]*)>/<manifest$1>\n    <uses-permission android:name="android.permission.INTERNET" \/>/' "$manifest"
           fi
       - run: flutter pub get
-      - run: flutter build apk --release
-      # splits.abi 产出 3 个 APK：app-arm64-v8a-release.apk / app-armeabi-v7a-release.apk / app-x86_64-release.apk
+      # --split-per-abi 产出 3 个 APK：app-arm64-v8a-release.apk / app-armeabi-v7a-release.apk / app-x86_64-release.apk
+      - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
           name: WorkReportGenerator_android_apk
@@ -55,6 +55,9 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
       - run: flutter pub run msix:create
+      # 安装 NSIS（GitHub Actions windows-latest 未预装）
+      - name: Setup NSIS
+        uses: timheuer/Setup-NSIS@v1
       # 用 NSIS 打包散文件为 .exe 安装器（支持 /S 静默安装 + 自动重启）
       - name: Build NSIS installer
         shell: pwsh
@@ -64,16 +67,7 @@ jobs:
           $IconPath = "wiz_work_repo_tool_logo.png"
           $OutFile = "dist\WorkReportGenerator_windows_setup.exe"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          # 查找 makensis（GitHub Actions windows-latest 预装 NSIS）
-          $MakeNSIS = Get-Command makensis -ErrorAction SilentlyContinue
-          if (-not $MakeNSIS) {
-            $MakeNSIS = Get-Command "C:\Program Files (x86)\NSIS\makensis.exe" -ErrorAction SilentlyContinue
-          }
-          if (-not $MakeNSIS) {
-            Write-Error "makensis not found. Install NSIS or add to PATH."
-            exit 1
-          }
-          & $MakeNSIS.Source `
+          & makensis `
             "-DVERSION=$Version" `
             "-DSOURCE_DIR=$SourceDir" `
             "-DICON_PATH=$IconPath" `
