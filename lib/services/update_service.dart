@@ -74,33 +74,35 @@ class UpdateService {
 
   Future<Map<String, dynamic>?> _preferredAsset(
       List<Map<String, dynamic>> assets) async {
-    final androidAbiSuffixes = await _androidAbiAssetSuffixes();
+    final androidAbiFragments = await _androidAbiFragments();
     // 产物命名格式：WorkReportGenerator_<platform>_<version>.<ext>
     // 版本号插在平台关键词和扩展名之间，纯 endsWith('_windows.zip') 匹配不到
-    // WorkReportGenerator_windows_1.2.21.zip，因此用 contains + endsWith 组合。
-    final rules = <({String keyword, String suffix})>[
+    // WorkReportGenerator_windows_1.2.21.zip，因此用 contains 匹配。
+    final rules = <({String keyword, String fragment})>[
       if (Platform.isAndroid) ...[
-        for (final s in androidAbiSuffixes)
-          (keyword: 'android', suffix: s),
-        (keyword: 'android', suffix: '.apk'),
-        (keyword: '', suffix: '.apk'),
+        // split APK 文件名格式：WorkReportGenerator_android_<abi>_<version>.apk
+        // 版本号在 abi 后面，不能纯用 endsWith，改用 contains 匹配 abi 片段
+        for (final abi in androidAbiFragments)
+          (keyword: 'android', fragment: abi),
+        (keyword: 'android', fragment: '.apk'),
+        (keyword: '', fragment: '.apk'),
       ],
       if (Platform.isWindows) ...[
-        (keyword: 'windows', suffix: '.exe'),
-        (keyword: 'windows', suffix: '.zip'),
-        (keyword: 'windows', suffix: '.msix'),
+        (keyword: 'windows', fragment: '.exe'),
+        (keyword: 'windows', fragment: '.zip'),
+        (keyword: 'windows', fragment: '.msix'),
       ],
       if (Platform.isMacOS) ...[
-        (keyword: 'macos', suffix: '.dmg'),
-        (keyword: 'macos', suffix: '.pkg'),
-        (keyword: '', suffix: '.dmg'),
+        (keyword: 'macos', fragment: '.dmg'),
+        (keyword: 'macos', fragment: '.pkg'),
+        (keyword: '', fragment: '.dmg'),
       ],
     ];
 
     for (final rule in rules) {
       for (final asset in assets) {
         final name = (asset['name'] as String? ?? '').toLowerCase();
-        if (name.endsWith(rule.suffix) &&
+        if (name.contains(rule.fragment) &&
             (rule.keyword.isEmpty || name.contains(rule.keyword))) {
           return asset;
         }
@@ -109,7 +111,9 @@ class UpdateService {
     return null;
   }
 
-  Future<List<String>> _androidAbiAssetSuffixes() async {
+  /// 返回当前设备支持的 ABI 对应的文件名片段（如 '_arm64-v8a_'）。
+  /// 用于匹配 split APK 文件名 WorkReportGenerator_android_<abi>_<version>.apk。
+  Future<List<String>> _androidAbiFragments() async {
     if (!Platform.isAndroid) {
       return const [];
     }
@@ -119,7 +123,7 @@ class UpdateService {
       const knownAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64'];
       return [
         for (final abi in knownAbis)
-          if (supported.contains(abi)) '_android_$abi.apk',
+          if (supported.contains(abi)) '_${abi}_',
       ];
     } catch (_) {
       return const [];

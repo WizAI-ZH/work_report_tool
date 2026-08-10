@@ -2,6 +2,17 @@
 
 本文档记录"威智工作汇报器"的版本更新内容。发布脚本会读取对应版本的小节，并同步写入 GitHub Release 描述。
 
+## [1.2.23] - 2026-08-10
+
+### 新增
+
+- Android APK 按 ABI 拆分（arm64-v8a / armeabi-v7a / x86_64），单包体积从 ~53MB 降至 ~20MB。应用内更新自动匹配当前设备 CPU 架构，下载对应 split APK。
+- Windows 端 NSIS .exe 安装器：CI 自动用 makensis 打包散文件为 .exe 安装器，支持 `/S` 静默安装。应用内更新下载 .exe 后自动启动安装器，安装器会自动关闭旧进程、替换文件、重启应用，无需手动操作。
+
+### 修复
+
+- 修复 Android split APK 文件名匹配：文件名格式为 `WorkReportGenerator_android_<abi>_<version>.apk`（版本号在 ABI 后），原 `endsWith` 匹配不到，改用 `contains` 匹配 ABI 片段。
+
 ## [1.2.22] - 2026-08-06
 
 ### 修复

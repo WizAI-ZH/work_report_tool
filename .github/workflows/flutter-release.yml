@@ -37,10 +37,11 @@ jobs:
           fi
       - run: flutter pub get
       - run: flutter build apk --release
+      # splits.abi 产出 3 个 APK：app-arm64-v8a-release.apk / app-armeabi-v7a-release.apk / app-x86_64-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: WorkReportGenerator_android_apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-*-release.apk
 
   windows:
     runs-on: windows-latest
@@ -54,12 +55,38 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
       - run: flutter pub run msix:create
+      # 用 NSIS 打包散文件为 .exe 安装器（支持 /S 静默安装 + 自动重启）
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          $Version = (Select-String -Path pubspec.yaml -Pattern '^version:' | Select-Object -First 1).Line -replace 'version:\s*','' -replace '\+.*',''
+          $SourceDir = "build\windows\x64\runner\Release"
+          $IconPath = "wiz_work_repo_tool_logo.png"
+          $OutFile = "dist\WorkReportGenerator_windows_setup.exe"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          # 查找 makensis（GitHub Actions windows-latest 预装 NSIS）
+          $MakeNSIS = Get-Command makensis -ErrorAction SilentlyContinue
+          if (-not $MakeNSIS) {
+            $MakeNSIS = Get-Command "C:\Program Files (x86)\NSIS\makensis.exe" -ErrorAction SilentlyContinue
+          }
+          if (-not $MakeNSIS) {
+            Write-Error "makensis not found. Install NSIS or add to PATH."
+            exit 1
+          }
+          & $MakeNSIS.Source `
+            "-DVERSION=$Version" `
+            "-DSOURCE_DIR=$SourceDir" `
+            "-DICON_PATH=$IconPath" `
+            "-DOUT_FILE=$OutFile" `
+            "installer\windows\nsis\wiz_work_report_tool.nsi"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
           name: WorkReportGenerator_windows
           path: |
             build/windows/x64/runner/Release/**
             build/windows/x64/runner/Release/*.msix
+            dist/WorkReportGenerator_windows_setup.exe
 
   macos:
     runs-on: macos-latest
@@ -114,14 +141,26 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release
-          mv artifacts/WorkReportGenerator_android_apk/app-release.apk \
-             release/WorkReportGenerator_android_${{ steps.ver.outputs.version }}.apk
+          # Android: 3 个 split APK，重命名为标准格式 WorkReportGenerator_android_<abi>_<version>.apk
+          for apk in artifacts/WorkReportGenerator_android_apk/app-*-release.apk; do
+            basename=$(basename "$apk")
+            # app-arm64-v8a-release.apk → arm64-v8a
+            abi=$(echo "$basename" | sed -E 's/app-(.+)-release\.apk/\1/')
+            cp "$apk" "release/WorkReportGenerator_android_${abi}_${{ steps.ver.outputs.version }}.apk"
+          done
+          # macOS dmg
           mv artifacts/WorkReportGenerator_macos/WorkReportGenerator_macos.dmg \
              release/WorkReportGenerator_macos_${{ steps.ver.outputs.version }}.dmg
-          # Windows 产物是散文件，打包成 zip
-          # 文件名用 _windows.zip 结尾，兼容旧版本应用的 endsWith('_windows.zip') 匹配
+          # Windows: 优先上传 NSIS .exe 安装器（应用内更新优先匹配 .exe，支持 /S 静默安装）
+          if [ -f artifacts/WorkReportGenerator_windows/WorkReportGenerator_windows_setup.exe ]; then
+            cp artifacts/WorkReportGenerator_windows/WorkReportGenerator_windows_setup.exe \
+               release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows_setup.exe
+          fi
+          # Windows 散文件打包成 zip（备用，兼容旧版本应用的 endsWith('_windows.zip') 匹配）
+          # 排除 setup.exe 和 msix，它们已单独上传
           cd artifacts/WorkReportGenerator_windows
-          zip -r "../../release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows.zip" .
+          zip -r "../../release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows.zip" . \
+            -x "WorkReportGenerator_windows_setup.exe" "*.msix"
           cd ../..
           # 同时附带 msix（如果存在）
           if [ -f artifacts/WorkReportGenerator_windows/*.msix ]; then
