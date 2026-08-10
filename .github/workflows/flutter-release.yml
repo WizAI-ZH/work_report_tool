@@ -151,19 +151,22 @@ jobs:
           mv artifacts/WorkReportGenerator_macos/WorkReportGenerator_macos.dmg \
              release/WorkReportGenerator_macos_${{ steps.ver.outputs.version }}.dmg
           # Windows: 优先上传 NSIS .exe 安装器（应用内更新优先匹配 .exe，支持 /S 静默安装）
-          if [ -f artifacts/WorkReportGenerator_windows/WorkReportGenerator_windows_setup.exe ]; then
-            cp artifacts/WorkReportGenerator_windows/WorkReportGenerator_windows_setup.exe \
+          # setup.exe 可能在 artifact 根目录或 dist/ 子目录（取决于 upload-artifact 路径保留）
+          SETUP_EXE=$(find artifacts/WorkReportGenerator_windows -name "*setup.exe" -o -name "*_setup.exe" | head -1)
+          if [ -n "$SETUP_EXE" ]; then
+            cp "$SETUP_EXE" \
                release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows_setup.exe
           fi
           # Windows 散文件打包成 zip（备用，兼容旧版本应用的 endsWith('_windows.zip') 匹配）
           # 排除 setup.exe 和 msix，它们已单独上传
           cd artifacts/WorkReportGenerator_windows
           zip -r "../../release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows.zip" . \
-            -x "WorkReportGenerator_windows_setup.exe" "*.msix"
+            -x "WorkReportGenerator_windows_setup.exe" "dist/*" "*.msix"
           cd ../..
           # 同时附带 msix（如果存在）
-          if [ -f artifacts/WorkReportGenerator_windows/*.msix ]; then
-            mv artifacts/WorkReportGenerator_windows/*.msix \
+          MSIX_FILE=$(find artifacts/WorkReportGenerator_windows -name "*.msix" | head -1)
+          if [ -n "$MSIX_FILE" ]; then
+            mv "$MSIX_FILE" \
                release/WorkReportGenerator_${{ steps.ver.outputs.version }}_windows.msix
           fi
       - name: Extract changelog section for this version
