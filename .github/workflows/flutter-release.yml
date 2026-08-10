@@ -57,7 +57,8 @@ jobs:
       - run: flutter pub run msix:create
       # 安装 NSIS（GitHub Actions windows-latest 未预装）
       - name: Setup NSIS
-        uses: timheuer/Setup-NSIS@v1
+        shell: pwsh
+        run: choco install nsis -y --no-progress
       # 用 NSIS 打包散文件为 .exe 安装器（支持 /S 静默安装 + 自动重启）
       - name: Build NSIS installer
         shell: pwsh
@@ -67,7 +68,11 @@ jobs:
           $IconPath = "wiz_work_repo_tool_logo.png"
           $OutFile = "dist\WorkReportGenerator_windows_setup.exe"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          & makensis `
+          $MakeNSIS = Get-Command makensis -ErrorAction SilentlyContinue
+          if (-not $MakeNSIS) {
+            $MakeNSIS = Get-Command "C:\Program Files (x86)\NSIS\makensis.exe" -ErrorAction SilentlyContinue
+          }
+          & $MakeNSIS.Source `
             "-DVERSION=$Version" `
             "-DSOURCE_DIR=$SourceDir" `
             "-DICON_PATH=$IconPath" `
