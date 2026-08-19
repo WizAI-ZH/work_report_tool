@@ -348,6 +348,32 @@ def safe_win_rect(win):
         return None
 
 
+def edit_distance(s1, s2):
+    """计算两个字符串的 Levenshtein 编辑距离。
+    用于容错 OCR 识别的错别字、漏字（如"赛事"→"赛中"、"赛事平台"→"事平台"）。"""
+    if len(s1) < len(s2):
+        s1, s2 = s2, s1
+    if len(s2) == 0:
+        return len(s1)
+    prev = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        curr = [i + 1]
+        for j, c2 in enumerate(s2):
+            curr.append(min(prev[j + 1] + 1, curr[j] + 1, prev[j] + (c1 != c2)))
+        prev = curr
+    return prev[-1]
+
+
+def similarity(s1, s2):
+    """返回 0-1 相似度，1=完全相同。基于编辑距离归一化。"""
+    if not s1 and not s2:
+        return 1.0
+    m = max(len(s1), len(s2))
+    if m == 0:
+        return 1.0
+    return 1.0 - edit_distance(s1, s2) / m
+
+
 def ocr_find_group(region, group):
     """在指定屏幕区域 OCR 识别，找到群名对应的搜索结果项坐标。
 
@@ -408,14 +434,27 @@ def ocr_find_group(region, group):
         cx = sum(xs) / 4 + crop_left
         cy = sum(ys) / 4 + crop_top
         log(f"  [{idx}] text={text!r} score={score:.2f} h={int(height)} w={int(width)} center=({int(cx)},{int(cy)})")
-        if group in text or text in group:
-            if min(len(text), len(group)) < len(group) * 0.6:
-                continue
+        # 去除 OCR 文本中常见的群成员数后缀（如"（22）"）再匹配，避免后缀干扰相似度。
+        import re
+        text_clean = re.sub(r'[（(]\d+[)）]', '', text).strip()
+        # 匹配策略：子串包含 OR 编辑距离模糊匹配（容错 OCR 错别字/漏字，如"赛事"→"赛中"）。
+        matched = False
+        match_reason = ""
+        if group in text_clean or text_clean in group:
+            if min(len(text_clean), len(group)) >= len(group) * 0.6:
+                matched = True
+                match_reason = "substring"
+        if not matched:
+            sim = similarity(group, text_clean)
+            if sim >= 0.85:
+                matched = True
+                match_reason = f"fuzzy(sim={sim:.2f})"
+        if matched:
             if cy < top + 150:
-                log(f"    -> matched but in search box area, skip")
+                log(f"    -> matched({match_reason}) but in search box area, skip")
                 continue
             candidates.append((height, cx, cy, text, score))
-            log(f"    -> MATCHED candidate (h={int(height)})")
+            log(f"    -> MATCHED candidate (h={int(height)}, {match_reason})")
 
     if not candidates:
         log("NO_MATCHED_CANDIDATES")
@@ -488,6 +527,12 @@ def verify_conversation(win, group):
             # 允许 OCR 多识别少量字符（如群成员数），但差距不能太大。
             found = True
             log(f"  VERIFY MATCHED (near): {text!r} contains {group!r}")
+        else:
+            # 模糊匹配兜底：容错 OCR 漏字/错别字（如"赛事平台"→"事平台"）。
+            sim = similarity(group_norm, t_norm)
+            if sim >= 0.85:
+                found = True
+                log(f"  VERIFY MATCHED (fuzzy): {text!r} sim={sim:.2f} vs {group!r}")
 
     if not found:
         log(f"VERIFY FAILED: target {group!r} not in conversation title")

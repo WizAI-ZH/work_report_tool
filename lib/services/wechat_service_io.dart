@@ -64,8 +64,10 @@ class WechatService {
     }
 
     if (Platform.isWindows) {
-      final ok = await _windowsSend(target, message);
-      return ok ? 'sent' : 'failed';
+      // 企微风控限制自动化发送，Windows 端只打开企微+复制到剪贴板，
+      // 由用户手动粘贴发送。返回 'manual' 让调用方显示友好提示。
+      await _windowsSend(target, message);
+      return 'manual';
     }
 
     // 其他平台暂不支持全自动，退化为打开企微+复制内容。
@@ -106,32 +108,8 @@ class WechatService {
   }
 
   Future<bool> _windowsSend(String groupName, String message) async {
-    // 优先用独立 exe（PyInstaller 打包，含 OCR 模型和所有依赖），
-    // 用户的机器不需要装 Python。开发时 fallback 到 python 脚本。
-    final helperPath = _resolveHelperPath();
-    if (helperPath != null) {
-      try {
-        final env = Map<String, String>.from(Platform.environment)
-          ..['WECHAT_GROUP'] = groupName
-          ..['WECHAT_MESSAGE'] = message;
-        final isExe = helperPath.endsWith('.exe');
-        final result = await Process.run(
-          isExe ? helperPath : 'python',
-          isExe ? <String>[] : <String>[helperPath],
-          environment: env,
-          stdoutEncoding: null,
-          stderrEncoding: null,
-        );
-        if (result.exitCode == 0) {
-          return true;
-        }
-        // exe/脚本失败（找不到窗口等），继续走兜底。
-      } catch (_) {
-        // exe 不存在或脚本异常，继续走兜底。
-      }
-    }
-
-    // 兜底：启动企微 + 复制到剪贴板，提示用户手动粘贴发送。
+    // 企微对自动化操作有风控，全自动发送会被限制（账号可能被禁言/封禁）。
+    // 故 Windows 端只做：启动企微 + 复制汇报到剪贴板，由用户手动粘贴发送。
     String? exePath;
     for (final path in _windowsPaths) {
       if (await File(path).exists()) {
@@ -146,28 +124,6 @@ class WechatService {
       } catch (_) {}
     }
     return false;
-  }
-
-  /// 查找企微发送助手路径。优先找打包后的独立 exe（不需要 Python），
-  /// 开发时 fallback 到 python 脚本。
-  /// 打包后：可执行文件同级 scripts/send_to_wework.exe
-  /// 开发时：cwd/scripts/send_to_wework.py
-  String? _resolveHelperPath() {
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-    final candidates = <String>[
-      // 打包后：独立 exe（PyInstaller 打包，含所有依赖）
-      '$exeDir\\scripts\\send_to_wework.exe',
-      // 开发时：python 脚本
-      '${Directory.current.path}\\scripts\\send_to_wework.py',
-      // 打包后 fallback：python 脚本（开发者机器）
-      '$exeDir\\scripts\\send_to_wework.py',
-    ];
-    for (final path in candidates) {
-      if (File(path).existsSync()) {
-        return path;
-      }
-    }
-    return null;
   }
 
   static final _enterpriseWechatUris = [

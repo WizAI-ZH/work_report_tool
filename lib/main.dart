@@ -369,6 +369,9 @@ class _HomePageState extends State<HomePage> {
       case 'sent':
         _showSnack('已发送到企微“$_wechatTarget”');
         break;
+      case 'manual':
+        _showSnack('已打开企微并复制汇报内容，请切换到企微粘贴发送');
+        break;
       case 'no_accessibility':
         _showSnack('未开启无障碍权限，请在系统设置中开启后重试');
         break;
