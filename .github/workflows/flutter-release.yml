@@ -36,6 +36,14 @@ jobs:
             perl -0pi -e 's/<manifest([^>]*)>/<manifest$1>\n    <uses-permission android:name="android.permission.INTERNET" \/>/' "$manifest"
           fi
       - run: flutter pub get
+      # 用固定的 debug.keystore 签名，保证每次 CI 产出的 APK 签名一致，可覆盖安装更新。
+      # 否则 ubuntu runner 每次构建会临时生成新的 debug.keystore，导致签名不一致无法覆盖安装。
+      - name: Restore Android debug keystore
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p ~/.android
+          echo "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
       # --split-per-abi 产出 3 个 APK：app-arm64-v8a-release.apk / app-armeabi-v7a-release.apk / app-x86_64-release.apk
       - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
