@@ -1,4 +1,4 @@
-﻿Unicode true
+Unicode true
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
@@ -74,8 +74,21 @@ Section "Install"
   SetShellVarContext all
   IfSilent 0 installFiles
     nsExec::ExecToLog 'taskkill /IM "${APP_EXE}" /F'
+    ; 等待进程完全退出并释放文件句柄，否则 File /r 覆盖 exe/DLL 时会
+    ; 因文件被占用而跳过，导致安装不完整、双击 exe 无反应。
+    Sleep 2000
 
 installFiles:
+  ; 先清空旧目录（保留 Uninstall.exe），避免旧版本残留文件干扰
+  ; 静默更新时尤为重要：旧 DLL 可能与新 exe 不兼容
+  IfSilent 0 copyFiles
+    Delete "$INSTDIR\${APP_EXE}"
+    Delete "$INSTDIR\flutter_windows.dll"
+    RMDir /r "$INSTDIR\data"
+    RMDir /r "$INSTDIR\plugins"
+    Delete "$INSTDIR\*.dll"
+
+copyFiles:
   SetOutPath "$INSTDIR"
   File /r "${SOURCE_DIR}\*.*"
 
@@ -96,7 +109,8 @@ installFiles:
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
 
   IfSilent 0 installDone
-    Exec "$INSTDIR\${APP_EXE}"
+    ; 静默更新后用 ExecShell（而非 Exec）启动应用，确保在用户交互桌面显示
+    ExecShell "" "$INSTDIR\${APP_EXE}"
 
 installDone:
 SectionEnd
