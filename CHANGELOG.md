@@ -2,6 +2,15 @@
 
 本文档记录"威智工作汇报器"的版本更新内容。发布脚本会读取对应版本的小节，并同步写入 GitHub Release 描述。
 
+## [1.2.29] - 2026-08-10
+
+### 修复
+
+- 彻底修复 Android 应用内更新"签名不一致"问题：之前恢复 keystore 到 `~/.android/debug.keystore` 后 CI 构建实际未使用（ubuntu runner 的 `ANDROID_SDK_HOME`/`HOME` 环境变量导致默认查找路径不一致）。
+- 改为在 `build.gradle.kts` 中显式配置 `signingConfig` 读取固定路径 `android/app/debug.keystore`，CI 从 GitHub Secret 恢复到该路径并验证 SHA1 指纹，不再依赖 Gradle 默认路径查找。
+- 签名指纹：SHA1 `78:71:47:AD:70:E5:5F:DB:52:87:DA:BA:1B:1B:0F:97:1C:49:3E:9A`，后续版本均使用此签名。
+- 注意：1.2.21–1.2.28 版本签名不一致，**首次安装 1.2.29 前需卸载旧版本**，之后即可正常应用内更新。
+
 ## [1.2.28] - 2026-08-10
 
 ### 修复

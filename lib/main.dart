@@ -24,7 +24,7 @@ const _appName = '威智工作汇报器';
 // 注意：此版本号必须与 pubspec.yaml 的 version 字段保持一致！
 // 应用内更新检查依赖此值与 GitHub Release 最新 tag 对比，若忘记
 // 同步更新，会导致安装新版本后仍误报"发现新版本"。
-const _appVersion = '1.2.28';
+const _appVersion = '1.2.29';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
